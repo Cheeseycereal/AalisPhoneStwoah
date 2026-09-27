@@ -90,7 +90,7 @@ export function addPlan({ text, date, time = '', who = 'user', source = 'user' }
     // Из тега ролевой не логируем: это её же собственная сцена, дубль не нужен
     if (source === 'user') {
         try {
-            logSocialToChat(`${getUserName()} записывает в календарь телефона: ${fmtPlanDate(plan.date)}${plan.time ? `, ${plan.time}` : ''} — ${plan.text}${plan.who === 'both' ? ' (вместе)' : plan.who === 'char' ? ' (не её дело, а его/её)' : ''}`, { priv: true });
+            logSocialToChat(`${getUserName()} writes it into the phone's calendar: ${fmtPlanDate(plan.date)}${plan.time ? `, ${plan.time}` : ''} — ${plan.text}${plan.who === 'both' ? ' (together)' : plan.who === 'char' ? " (not their business — the character's own)" : ''}`, { priv: true });
         } catch (e) { /* ignore */ }
     }
     return plan;
