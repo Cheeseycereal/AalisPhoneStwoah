@@ -873,8 +873,8 @@ function renderSocialHub(screen) {
         ${event ? `<button class="gp-iconbtn gp-event-pulse" data-open-story title="Сюжетный поворот">${ic('fa-wand-sparkles')}</button>` : ''}
     </div><div class="gp-feed gp-social-hub">
         <div class="gp-profile-grid">
-            <div class="gp-profile-card"><div>${brand('fa-x-twitter')} Twitter</div><b>${compactNum(s.socialProfiles.twitter.followers)}</b><span>подписчиков · ${esc(repLabelOf(s, 'twitter'))}</span></div>
-            <div class="gp-profile-card"><div>${brand('fa-instagram')} Instagram</div><b>${compactNum(s.socialProfiles.instagram.followers)}</b><span>подписчиков · ${esc(repLabelOf(s, 'instagram'))}</span></div>
+            <div class="gp-profile-card"><div>${brand('fa-x-twitter')} Twitter<button class="gp-iconbtn gp-followers-edit" data-followers-edit="twitter" title="${tr('Задать число подписчиков')}">${ic('fa-pen')}</button></div><b>${compactNum(s.socialProfiles.twitter.followers)}</b><span>подписчиков · ${esc(repLabelOf(s, 'twitter'))}</span></div>
+            <div class="gp-profile-card"><div>${brand('fa-instagram')} Instagram<button class="gp-iconbtn gp-followers-edit" data-followers-edit="instagram" title="${tr('Задать число подписчиков')}">${ic('fa-pen')}</button></div><b>${compactNum(s.socialProfiles.instagram.followers)}</b><span>подписчиков · ${esc(repLabelOf(s, 'instagram'))}</span></div>
         </div>
         <section class="gp-social-section gp-ad-section"><h3>${ic('fa-star')} Рекламные предложения</h3>
             ${ads.active
@@ -906,6 +906,21 @@ function renderSocialHub(screen) {
         toast('Системы выключены', 'fa-power-off');
         render();
     });
+    // Свой стартовый счётчик подписчиков — не хочется начинать «с нуля»
+    screen.querySelectorAll('[data-followers-edit]').forEach(b => b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const platform = b.getAttribute('data-followers-edit');
+        const p = getSocial().socialProfiles?.[platform];
+        if (!p) return;
+        const raw = prompt(`${tr('Сколько подписчиков')} (${platform === 'twitter' ? 'Twitter' : 'Instagram'}):`, String(p.followers));
+        if (raw === null) return;
+        const n = Math.max(0, Math.round(Number(String(raw).replace(/[^\d.-]/g, ''))));
+        if (!Number.isFinite(n)) { toast(tr('Введи число'), 'fa-circle-exclamation'); return; }
+        p.followers = n;
+        saveMeta();
+        toast(tr('Подписчики обновлены'), 'fa-check');
+        render();
+    }));
     screen.querySelectorAll('[data-ad-accept]').forEach(b => b.addEventListener('click', () => { acceptAdOffer(b.getAttribute('data-ad-accept')); toast('Рекламное задание принято', 'fa-star'); render(); }));
     screen.querySelectorAll('[data-ad-decline]').forEach(b => b.addEventListener('click', () => { declineAdOffer(b.getAttribute('data-ad-decline')); render(); }));
     screen.querySelector('#gp-ad-generate')?.addEventListener('click', async () => {
