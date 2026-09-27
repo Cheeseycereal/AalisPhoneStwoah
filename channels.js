@@ -111,9 +111,9 @@ export function addAnonPosts(arr, { fromTag = false } = {}) {
     // Пишем ВСЕГДА, в том числе про посты из тега: сам тег — сырой JSON
     // посреди прозы, и в следующем ходе модель не помнит, что публиковала.
     logSocialToChat(
-        `В «${ANON_NAME}» (городская анонимка, её читает ${getUserName()}) ${fromTag ? 'появился новый пост' : 'появились новые посты'}: `
-        + fresh.map(p => `«${p.text.slice(0, 200)}»${p.to ? ` — адресовано ${p.to}` : ''}`).join('; ')
-        + `. Авторы не подписаны.`,
+        `In "${ANON_NAME}" (the town's anon feed, ${getUserName()} reads it) ${fromTag ? 'a new post appeared' : 'new posts appeared'}: `
+        + fresh.map(p => `"${p.text.slice(0, 200)}"${p.to ? ` — addressed to ${p.to}` : ''}`).join('; ')
+        + `. Posts aren't signed by an author.`,
     );
     return fresh.length;
 }
@@ -175,7 +175,7 @@ export function chargeAnonReveal(postId) {
     if (post.byUser) throw new Error('Это твой собственный пост');
     const price = anonRevealPrice();
     if (getBank().balance < price) throw new Error('Не хватает денег на карте');
-    addTransaction({ amount: -price, label: `Автор анонимки в «${ANON_NAME}»`, category: 'анонимка', silent: true });
+    addTransaction({ amount: -price, label: `Anon post author in "${ANON_NAME}"`, category: 'анонимка', silent: true });
     post.revealed = true;
     post.revealPrice = price;
     ch.reveals = (ch.reveals || 0) + 1;
@@ -192,9 +192,9 @@ export function setAnonAuthor(postId, { name = '', who = '', why = '' } = {}) {
     if (why) post.realWhy = String(why).trim().slice(0, 300);
     saveMeta();
     logSocialToChat(
-        `${getUserName()} платит ${fmtMoney(post.revealPrice || 0)} админу «${ANON_NAME}», чтобы узнать, кто прислал пост «${post.text.slice(0, 140)}». `
-        + `Называют имя: ${post.realAuthor || 'автора так и не нашли'}.${post.realWho ? ` ${post.realWho}` : ''}${post.realWhy ? ` ${post.realWhy}` : ''} `
-        + `Знает об этом только ${getUserName()} — сам автор не в курсе, что его вычислили.`,
+        `${getUserName()} pays ${fmtMoney(post.revealPrice || 0)} to the "${ANON_NAME}" admin to find out who sent the post "${post.text.slice(0, 140)}". `
+        + `Name given: ${post.realAuthor || 'the author was never found'}.${post.realWho ? ` ${post.realWho}` : ''}${post.realWhy ? ` ${post.realWhy}` : ''} `
+        + `Only ${getUserName()} knows this — the author themselves has no idea they've been identified.`,
         { priv: true },
     );
     return post;
@@ -334,8 +334,8 @@ export function addChannelPosts(id, arr, { fromTag = false } = {}) {
     if (ch.subscribed) ch.unread = (ch.unread || 0) + fresh.length;
     saveMeta();
     logSocialToChat(
-        `В канале «${ch.name}»${ch.author ? ` (ведёт ${ch.author})` : ''} ${fromTag ? 'новый пост' : 'новые посты'}: `
-        + fresh.map(p => `«${String(p.text || p.imgDesc || '').slice(0, 200)}»`).join('; '),
+        `In channel "${ch.name}"${ch.author ? ` (run by ${ch.author})` : ''} ${fromTag ? 'a new post' : 'new posts'}: `
+        + fresh.map(p => `"${String(p.text || p.imgDesc || '').slice(0, 200)}"`).join('; '),
     );
     return fresh.length;
 }
@@ -462,12 +462,12 @@ export function addReacts(post, arr) {
 function logCommentsDigest(channel, post, fresh) {
     if (!channel || !fresh.length) return;
     const where = channel.system
-        ? `под анонимкой в «${channel.name}»`
-        : `в обсуждении канала «${channel.name}»`;
-    const what = String(post.text || post.imgDesc || 'пост').slice(0, 120);
+        ? `under the anon post in "${channel.name}"`
+        : `in the discussion of channel "${channel.name}"`;
+    const what = String(post.text || post.imgDesc || 'post').slice(0, 120);
     const lines = fresh.slice(0, 4)
-        .map(c => `${c.author}: «${String(c.text).slice(0, 140)}»`).join(' | ');
-    logSocialToChat(`${where} (пост «${what}») пишут — ${lines}`);
+        .map(c => `${c.author}: "${String(c.text).slice(0, 140)}"`).join(' | ');
+    logSocialToChat(`${where} (post "${what}") people write — ${lines}`);
 }
 
 export function addComments(post, arr, { fromUser = false, channel = null } = {}) {
