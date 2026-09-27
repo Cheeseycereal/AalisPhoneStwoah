@@ -1,7 +1,6 @@
-import { getSettings } from './state.js';
-
+// Личная версия: интерфейс всегда на английском, переключатель языка убран
 export function lang() {
-    return getSettings().lang === 'en' ? 'en' : 'ru';
+    return 'en';
 }
 
 export const DAYS_I18N = {
@@ -120,6 +119,7 @@ const DICT = {
     'Уже знакомы вживую': 'We have met in person', 'Написать в «Сообщениях»': 'Write in Messages',
     'Анкеты кончились': 'No more profiles', 'Возвращать нечего': 'Nothing to undo',
     'Никто не нашёлся — попробуй ещё раз': 'Nobody turned up — try again',
+    'Нажми ↻ — подтянутся новые люди': 'Tap ↻ and new people will show up', 'Сначала лучше заполнить свою анкету': 'You should fill out your own profile first',
     'Анкета сохранена': 'Profile saved', 'Опиши, как выглядишь': 'Describe how you look',
     'Теперь знает тебя как обычного человека': 'Now they know you like anyone else',
     'Снова знает только по анкете': 'Back to knowing only your profile',
@@ -325,6 +325,8 @@ const DICT = {
     'Символ валюты (₽ $ € £ ...):': 'Currency symbol (₽ $ € £ ...):',
     'Ручная правка баланса карты (потратила в РП — спиши)': 'Manually edit the card balance (spent in RP — subtract it)',
     // Категории банка/трат
+    'донат': 'donation', 'стрим': 'stream', 'казино': 'casino', 'анонимка': 'anon post',
+    'Без названия': 'Untitled', 'зритель': 'viewer', 'пост': 'post',
     'еда': 'food', 'транспорт': 'transport', 'жильё': 'housing', 'подписка': 'subscription',
     'одежда': 'clothes', 'развлечения': 'fun', 'красота': 'beauty', 'здоровье': 'health',
     'подарок': 'gift', 'зарплата': 'salary', 'перевод': 'transfer', 'другое': 'other',
