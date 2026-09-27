@@ -1,4 +1,3 @@
-
 import { setExtensionPrompt, extension_prompt_types, extension_prompt_roles } from '../../../../script.js';
 import { getSettings, getMeta, scanChat, getBlockedSmsKeys, keyOf, EXT_NAME } from './state.js';
 import { getSocialActivitySummary } from './social.js';
@@ -150,6 +149,7 @@ function buildPrompt() {
             if (tin) c += `\n${tin}\n`;
         } catch (e) { /* ignore */ }
         c += `NEVER write <!--tel:log--> or lines starting with «[Событие мира» — that is the app's own journal format; a reply containing it gets hidden from the reader.\n`;
+        c += `TEXTING VOICE — text/tweet/caption/chan/tinder message content is gen-z texting, not prose: all lowercase always (incl. "i"), no end punctuation, light slang (u, ur, rn, ngl, fr, lowkey, tbh, istg, no cap, iykyk...), occasional elongation ("soooo") or emoji/caps for genuine emotion, phone-length messages (split into multiple tags if they'd double-text). Default for casual characters; formal/older characters can text properly instead.\n`;
         c += `</phone_directive>`;
         return c;
     }
@@ -185,6 +185,8 @@ function buildPrompt() {
     p += `NEVER emit a tel:sms whose "from" is {{user}} — their own messages are sent from the app, not written by you.\n`;
     p += `CRITICAL SCOPE: tel:sms is EXCLUSIVELY for messages arriving on {{user}}'s OWN phone. What ANY other character (including yours) gets on THEIR phone — prose only, NEVER a tag; if tagged anyway it MUST carry "to":"RecipientName" so the app discards it.\n\n`;
 
+    p += `[TEXTING VOICE] The "text"/"caption" content of every tel:sms, tel:tweet, tel:insta, tel:chan, and Tinder message is typed on a phone, not written prose — it needs to read like an actual text, not a formal sentence with the caps and periods swapped out. All lowercase, always, including "i" and the start of the message — not optional. Drop the period at the end of a thought; use commas rarely. Contract and clip words the way real typing does: u, ur, rn, ngl, fr, lowkey/highkey, ong, ts, tbh, istg, deadass, no cap, bet, say less, iykyk, wyd, hbu, omw, idk, ig — pull from this pool, don't force one into every line. Elongate for emphasis sometimes ("soooo", "pleaseee"). Emoji and reaction-caps ("NOOO", "???", "LMAOO") are fair game for genuine emotional beats but shouldn't be in every message. Keep messages phone-length — a few words to a short sentence — splitting into multiple tags rather than one long paragraph if the character would double/triple text. This is the DEFAULT voice for casual characters; an older, more formal, or professional-context character (a channel's official post, say) can write properly instead.\n\n`;
+
     // Самый жирный блок — только в телефонный ход
     if (phoneTurn === 'now') {
         p += `[RULE 3 — PHONE-ONLY MODE — ACTIVE NOW] Their last message came FROM THEIR PHONE: \`[СМС → Name]\`/\`[SMS → Name]\` (direct), \`[СМС в чат «Name»]\`/\`[SMS to chat «Name»]\` (group — reply as its members, each with "chat"), \`[Голосовое → Name]\`/\`[Voice → Name]\` (voice message: text is the transcript, the character HEARS {{user}}'s voice), \`*фото*\`/\`*photo*\` (photo attached — look at it if you can see images).\n`;
@@ -199,7 +201,7 @@ function buildPrompt() {
     if (social) {
         p += `[RULE 4 — SOCIAL TAGS] If a character posts publicly as a story event, append at the END:\n`;
         p += `<!--tel:tweet:{"author":"CharacterName","text":"tweet text"}--> / <!--tel:insta:{"author":"CharacterName","photo":"short visual description","caption":"caption text"}-->\n`;
-        p += `Only when the story actually involves posting — do not spam. NEVER post as {{user}}: their own posts are written by them in the app, and a tag with their name is discarded.\n`;
+        p += `Only when the story actually involves posting — do not spam. NEVER post as {{user}}: their own posts are written by them in the app, and a tag with their name is discarded. Text/caption follows the TEXTING VOICE rule above.\n`;
     }
 
     let socialSummary = '';
@@ -225,7 +227,7 @@ function buildPrompt() {
         if (chan) {
             p += `\n[{{user}}'S CHANNELS] ${chan}\n`;
             p += `[RULE 5 — CHANNEL POST] When a channel above would really publish something about what is happening now (news, a warning, the blogger's own remark), append at the END: <!--tel:chan:{"channel":"exact channel name","text":"the post as that channel writes it","photo":"one line of what the picture shows — or omit the field"}-->\n`;
-            p += `A channel not listed above may appear this way too — give it a plain "channel" name and the app adds it. NEVER post into {{user}}'s OWN channel: those are written by them in the app, and such a tag is discarded. Do not spam: at most 1-2 channel posts per reply, and only when the story gives a reason.\n`;
+            p += `A channel not listed above may appear this way too — give it a plain "channel" name and the app adds it. NEVER post into {{user}}'s OWN channel: those are written by them in the app, and such a tag is discarded. Do not spam: at most 1-2 channel posts per reply, and only when the story gives a reason. A casual personal blog's "text" follows TEXTING VOICE above; a news/official channel writes properly instead.\n`;
         }
     } catch (e) { /* ignore */ }
     // Календарь: правило ставим, только когда планы вообще заведены —
