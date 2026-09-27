@@ -1,4 +1,3 @@
-
 import { chat_metadata } from '../../../../script.js';
 import { extension_settings, saveMetadataDebounced } from '../../../extensions.js';
 
@@ -568,6 +567,10 @@ const TAG_RE = /<!--\s*tel:(contact|sms):(\{[\s\S]*?\})\s*-->/gi;
 const OUT_RE = /<!--\s*tel:out:(\{[\s\S]*?\})\s*-->/i;
 // «Персонаж решил не отвечать на смс» — пустой ответ телефона
 const SILENT_RE = /<!--\s*tel:silent\s*-->/i;
+// «Персонаж открыл переписку, но осознанно не отвечает» — левый-на-прочитанном.
+// В отличие от tel:silent, это НЕ «нет ответа вообще» — статус юзера меняется
+// с «Доставлено» на «Прочитано», просто без нового входящего сообщения.
+const SEEN_RE = /<!--\s*tel:seen:(\{[\s\S]*?\})\s*-->/gi;
 // Журнальная запись соцсетей (скрыта из ленты, но в контексте модели)
 const LOG_RE = /<!--\s*tel:log\s*-->/i;
 // Запись журнала пишет телефон: имя GlassPhone либо сообщение НАЧИНАЕТСЯ
@@ -578,7 +581,7 @@ export function isAppJournal(msg) {
     return /^\s*<!--\s*tel:log\s*-->/i.test(String(msg.mes));
 }
 // Любой наш тег (для детекта смс-only сообщений)
-const ANY_TEL_RE = /<!--\s*tel:(sms|contact|out|silent|log)/i;
+const ANY_TEL_RE = /<!--\s*tel:(sms|contact|out|silent|seen|log)/i;
 // Видимый формат исходящей смс (парсим как fallback, если JSON битый)
 // Видимый формат двуязычный: [СМС → X] / [SMS → X] (телефон пишет по языку UI);
 // [Голосовое → X] / [Voice → X] — голосовое сообщение (текст = расшифровка)
@@ -1128,6 +1131,24 @@ function scanChatUncached() {
             }
         }
 
+        // «Прочитано без ответа» — не создаёт сообщение, только двигает
+        // курсор seenIdx треда вперёд до текущего индекса сообщения чата.
+        if (!msg.is_user) {
+            SEEN_RE.lastIndex = 0;
+            let sm;
+            while ((sm = SEEN_RE.exec(text)) !== null) {
+                const j = safeJson(sm[1]);
+                if (!j || !j.from) continue;
+                const k = j.chat ? `group:${keyOf(j.chat)}` : keyOf(j.from);
+                if (!k || k === 'group:') continue;
+                if (!threads.has(k)) {
+                    threads.set(k, { name: j.chat ? String(j.chat) : String(j.from).trim(), messages: [], isGroup: k.startsWith('group:') });
+                }
+                const th = threads.get(k);
+                if (th.seenIdx === undefined || i > th.seenIdx) th.seenIdx = i;
+            }
+        }
+
         // Fallback: номер в прозе без тега («подхватываем»).
         // ТОЛЬКО видимый текст: html-комменты вырезаются — иначе таймстамп в имени
         // файла из маркера (sms_1783152188594.jpeg) ловился как «номер телефона»
@@ -1212,6 +1233,7 @@ export function getThreadList() {
             lastIdx: last ? last.idx : -1,
             unread,
             messages: msgs,
+            seenIdx: (t && Number.isFinite(t.seenIdx)) ? t.seenIdx : null,
         });
     }
     list.sort((a, b) => b.lastIdx - a.lastIdx);
