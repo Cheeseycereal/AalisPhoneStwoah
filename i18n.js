@@ -1,4 +1,3 @@
-
 import { getSettings } from './state.js';
 
 export function lang() {
@@ -30,6 +29,7 @@ const DICT = {
     'Перегенерировать': 'Regenerate', 'Другой ответ': 'Another reply', 'Не сейчас': 'Not now',
     'Сбросить кнопку': 'Reset button', 'Отчёт: последние действия': 'Report: recent activity', 'Убрать участника': 'Remove member', 'Убрать': 'Remove', 'Нарисовать товар': 'Draw the item', 'Фото товара готово': 'Item photo ready', 'Экран с системной панелью (сдвинуть телефон)': 'Screen with a system bar (shift the phone)', 'Перегенерировать пост': 'Regenerate post', 'Пересобрать ленту заново': 'Rebuild the feed', 'Дописать в ленту': 'Add to the feed', 'Пост переписан': 'Post rewritten', 'Не получилось переписать пост': 'Could not rewrite the post', 'Остановить генерацию': 'Stop generating', 'Остановить': 'Stop', 'Генерация остановлена': 'Generation stopped', 'Очистить телефон в этом чате': 'Wipe the phone in this chat', 'Сброс к заводским настройкам': 'Factory reset', 'Данные телефона в этом чате стёрты': 'Phone data in this chat wiped', 'Сброшено к заводским настройкам': 'Reset to factory settings', 'Отчёт скопирован в буфер': 'Report copied to clipboard', 'Сбросить настройки': 'Reset settings', 'Убрать из истории': 'Remove from history',
     'Пусто': 'Empty', 'случайный': 'random', 'авто': 'auto', 'Сегодня': 'Today', 'сейчас': 'now',
+    'Прочитано': 'Read', 'Доставлено': 'Delivered',
     'Имя': 'Name', 'Номер': 'Number', 'Название': 'Title', 'Описание': 'Description',
     'Категория': 'Category', 'Сумма': 'Amount', 'Цена': 'Price', 'Стиль': 'Style',
     'Валюта': 'Currency', 'Баланс': 'Balance', 'Баланс:': 'Balance:', 'Баланс карты': 'Card balance',
