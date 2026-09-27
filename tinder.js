@@ -138,10 +138,10 @@ export function swipeTinder(id, dir) {
             if (p.image) setContactAvatar(keyOf(p.name), p.image);
         } catch (e) { /* ignore */ }
         logSocialToChat(
-            `У ${getUserName()} мэтч в Тиндере: ${p.name}, ${p.age}${p.job ? `, ${p.job}` : ''}. `
-            + `Они понравились друг другу и теперь могут переписываться. ${p.name} видел${/[аяь]$/i.test(p.name) ? 'а' : ''} только анкету ${getUserName()} в приложении — `
-            + `где ${getUserName()} работает, с кем живёт и что было в прошлом, ${p.name} не знает, пока не расскажут. `
-            + `Переписка идёт внутри приложения — телефонами они пока не обменивались.`, { priv: true });
+            `${getUserName()} got a match on Tinder: ${p.name}, ${p.age}${p.job ? `, ${p.job}` : ''}. `
+            + `They liked each other and can now message. ${p.name} has only seen ${getUserName()}'s in-app profile — `
+            + `where ${getUserName()} works, who they live with, and their past, ${p.name} doesn't know until told. `
+            + `They're chatting inside the app — they haven't exchanged phone numbers yet.`, { priv: true });
     }
     saveMeta();
     return { matched, profile: p };
