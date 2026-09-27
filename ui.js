@@ -48,10 +48,6 @@ import { getDiscord, findDServer, findDChannel, refreshDiscordServers, createOwn
 import { getTwitch, findStream, refreshStreams, tickStream, donateToStream, startMyStream, tickMyStream, endMyStream, getTwitchNick, setTwitchNick } from './twitch.js';
 import { getNotes, addNote, updateNote, deleteNote, toggleNoteShared } from './notes.js';
 import {
-    getCycle, setCycleSettings, addEntry as addCycleEntry, updateEntry as updateCycleEntry,
-    deleteEntry as deleteCycleEntry, toggleEntryShared as toggleCycleEntryShared, cycleStatus, SYMPTOM_OPTIONS,
-} from './cycle.js';
-import {
     tinderEnabled, getTinder, getTinderMe, saveTinderMe, setTinderMePhoto,
     addTinderProfiles, currentCard, findProfile, swipeTinder, undoSwipe,
     getMatches, matchBadge, markMatchOpened, setMatchIrl, deleteMatch, setProfileImage,
@@ -699,7 +695,6 @@ export function render() {
     else if (currentScreen === 'stream') renderStream(screen);
     else if (currentScreen === 'mystream') renderMyStream(screen);
     else if (currentScreen === 'notes') renderNotes(screen);
-    else if (currentScreen === 'cycle') renderCycle(screen);
     else if (currentScreen === 'appearance') renderAppearance(screen);
     else renderHome(screen);
     // Возвращаем набранный текст: перерисовка (генерация картинки, публикация,
@@ -1269,10 +1264,6 @@ function renderHome(screen) {
                 <div class="gp-app" data-app="notes">
                     <div class="gp-app-icon gp-app-notes">${ic('fa-note-sticky')}${plansBadgeCount() > 0 ? `<span class="gp-app-badge">${plansBadgeCount()}</span>` : ''}</div>
                     <div class="gp-app-name">Заметки</div>
-                </div>
-                <div class="gp-app" data-app="cycle">
-                    <div class="gp-app-icon gp-app-cycle">${ic('fa-droplet')}</div>
-                    <div class="gp-app-name">Cycle</div>
                 </div>
                 ${tinderEnabled() ? `
                 <div class="gp-app" data-app="tinder">
@@ -5891,123 +5882,6 @@ function renderNotes(screen) {
             render();
         }
     }));
-}
-
-// ═══ CYCLE APP: plain period/symptom log, no fertility or pregnancy content ═══
-
-let _cycleEditId = null;
-let _cycleDraftSymptoms = [];
-
-function cycleFlowLabel(f) {
-    return { none: 'None', light: 'Light', medium: 'Medium', heavy: 'Heavy' }[f] || 'None';
-}
-
-function renderCycle(screen) {
-    currentScreen = 'cycle';
-    const c = getCycle();
-    const today = rpToday();
-    const status = cycleStatus(today);
-    const editing = _cycleEditId ? c.entries.find(e => e.id === _cycleEditId) : null;
-
-    const statusHtml = status
-        ? `<div class="gp-chan-section">Day ${status.day} of ${status.length}${status.inPeriod ? ' · Period' : status.pmsWindow ? ' · PMS window' : ''}</div>`
-        : `<div class="gp-empty-text" style="padding:6px">Log a period start to begin tracking.</div>`;
-
-    const symptomChips = SYMPTOM_OPTIONS.map(s => `
-        <button type="button" class="gp-tag-chip${_cycleDraftSymptoms.includes(s) ? ' gp-active' : ''}" data-symptom="${esc(s)}">${esc(s)}</button>`).join('');
-
-    setHtmlKeepScroll(screen, '.gp-notes-scroll', `
-        <div class="gp-header gp-thread-header">
-            <button class="gp-iconbtn" id="gp-back">${ic('fa-chevron-left')}</button>
-            <div class="gp-title gp-title-app gp-notes-title">Cycle</div>
-            <span style="width:32px"></span>
-        </div>
-        <div class="gp-notes-scroll">
-            ${statusHtml}
-            <div class="gp-notes-editor">
-                <label class="gp-plan-form" style="margin-bottom:8px">
-                    <input type="date" id="gp-cycle-date" value="${esc(editing ? editing.date : today)}">
-                    <select id="gp-cycle-flow">
-                        <option value="none" ${(!editing || editing.flow === 'none') ? 'selected' : ''}>Flow: none</option>
-                        <option value="light" ${editing?.flow === 'light' ? 'selected' : ''}>Flow: light</option>
-                        <option value="medium" ${editing?.flow === 'medium' ? 'selected' : ''}>Flow: medium</option>
-                        <option value="heavy" ${editing?.flow === 'heavy' ? 'selected' : ''}>Flow: heavy</option>
-                    </select>
-                </label>
-                <div class="gp-tag-chips">${symptomChips}</div>
-                <input type="text" id="gp-cycle-mood" placeholder="Mood (optional)" value="${esc(editing?.mood || '')}" style="margin:8px 0">
-                <textarea id="gp-cycle-note" rows="2" placeholder="Note (optional)">${esc(editing?.note || '')}</textarea>
-                <button class="gp-primary" id="gp-cycle-save">${editing ? 'Save' : 'Log entry'}</button>
-                ${editing ? `<button class="gp-secondary gp-unequip" id="gp-cycle-cancel">Cancel edit</button>` : ''}
-            </div>
-            <div class="gp-notes-editor" style="display:flex;gap:8px;align-items:center">
-                <label style="font-size:12px;color:#888">Cycle length</label>
-                <input type="number" id="gp-cycle-len" min="15" max="60" value="${c.avgLength}" style="width:60px">
-                <label style="font-size:12px;color:#888">Period length</label>
-                <input type="number" id="gp-cycle-plen" min="1" max="14" value="${c.periodLength}" style="width:50px">
-            </div>
-            ${c.entries.length === 0 ? `<div class="gp-empty-text" style="padding:12px 6px">No entries logged yet. Entries are private by default; the eye icon shares one with the narrator as background context.</div>`
-                : c.entries.map(e => `
-                <div class="gp-note${e.shared ? ' gp-note-shared' : ''}">
-                    <div class="gp-note-text" data-edit-cycle="${esc(e.id)}" title="Tap to edit">
-                        <b>${esc(e.date)}</b> — ${esc(cycleFlowLabel(e.flow))}${e.symptoms.length ? ` · ${esc(e.symptoms.join(', '))}` : ''}${e.mood ? ` · mood: ${esc(e.mood)}` : ''}
-                        ${e.note ? `<div style="opacity:.8;margin-top:4px">${esc(e.note)}</div>` : ''}
-                    </div>
-                    <div class="gp-note-meta">
-                        <span class="gp-tw-time">${e.shared ? 'shared with narrator' : 'private'}</span>
-                        <button class="gp-iconbtn gp-note-eye${e.shared ? ' gp-btn-on' : ''}" data-share-cycle="${esc(e.id)}" title="${e.shared ? 'Make private' : 'Share with narrator'}">${ic(e.shared ? 'fa-eye' : 'fa-eye-slash')}</button>
-                        <button class="gp-bank-tx-del" data-del-cycle="${esc(e.id)}" title="Delete">${ic('fa-xmark')}</button>
-                    </div>
-                </div>`).join('')}
-        </div>`);
-
-    screen.querySelector('#gp-back')?.addEventListener('click', () => { _cycleEditId = null; _cycleDraftSymptoms = []; goto('home'); });
-    if (editing) _cycleDraftSymptoms = [...editing.symptoms];
-    screen.querySelectorAll('[data-symptom]').forEach(btn => btn.addEventListener('click', () => {
-        const s = btn.getAttribute('data-symptom');
-        _cycleDraftSymptoms = _cycleDraftSymptoms.includes(s) ? _cycleDraftSymptoms.filter(x => x !== s) : [..._cycleDraftSymptoms, s];
-        render();
-    }));
-    screen.querySelector('#gp-cycle-save')?.addEventListener('click', () => {
-        const payload = {
-            date: screen.querySelector('#gp-cycle-date')?.value || today,
-            flow: screen.querySelector('#gp-cycle-flow')?.value || 'none',
-            symptoms: _cycleDraftSymptoms,
-            mood: screen.querySelector('#gp-cycle-mood')?.value || '',
-            note: screen.querySelector('#gp-cycle-note')?.value || '',
-        };
-        if (_cycleEditId) { updateCycleEntry(_cycleEditId, payload); _cycleEditId = null; }
-        else addCycleEntry(payload);
-        _cycleDraftSymptoms = [];
-        updatePhoneInjection();
-        render();
-    });
-    screen.querySelector('#gp-cycle-cancel')?.addEventListener('click', () => { _cycleEditId = null; _cycleDraftSymptoms = []; render(); });
-    screen.querySelectorAll('[data-edit-cycle]').forEach(el => el.addEventListener('click', () => {
-        _cycleEditId = el.getAttribute('data-edit-cycle'); render();
-    }));
-    screen.querySelectorAll('[data-share-cycle]').forEach(btn => btn.addEventListener('click', () => {
-        toggleCycleEntryShared(btn.getAttribute('data-share-cycle'));
-        updatePhoneInjection();
-        render();
-    }));
-    screen.querySelectorAll('[data-del-cycle]').forEach(btn => btn.addEventListener('click', () => {
-        if (confirm('Delete this entry?')) {
-            const id = btn.getAttribute('data-del-cycle');
-            deleteCycleEntry(id);
-            if (_cycleEditId === id) _cycleEditId = null;
-            updatePhoneInjection();
-            render();
-        }
-    }));
-    screen.querySelector('#gp-cycle-len')?.addEventListener('change', function () {
-        setCycleSettings({ avgLength: Number(this.value) });
-        render();
-    });
-    screen.querySelector('#gp-cycle-plen')?.addEventListener('change', function () {
-        setCycleSettings({ periodLength: Number(this.value) });
-        render();
-    });
 }
 
 // ═══ СКАМ-СМС: доставка призраком ═══
