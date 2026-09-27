@@ -3,7 +3,6 @@ import { getSettings, getMeta, scanChat, getBlockedSmsKeys, keyOf, EXT_NAME } fr
 import { getSocialActivitySummary } from './social.js';
 import { getBankSummaryLine, bankInjectRule } from './bank.js';
 import { notesInjectBlock } from './notes.js';
-import { cycleInjectBlock } from './cycle.js';
 import { channelInjectLine, anonInjectLine } from './channels.js';
 import { plansInjectLine, plansInjectRule, getPlans } from './plans.js';
 import { twitchInjectLine } from './twitch.js';
@@ -138,10 +137,6 @@ function buildPrompt() {
             if (notesBlock) c += `\n${notesBlock}\n`;
         } catch (e) { /* ignore */ }
         try {
-            const cycleBlock = cycleInjectBlock(rpToday());
-            if (cycleBlock) c += `\n${cycleBlock}\n`;
-        } catch (e) { /* ignore */ }
-        try {
             const live = twitchInjectLine();
             if (live) c += `\n${live}\n`;
         } catch (e) { /* ignore */ }
@@ -248,10 +243,6 @@ function buildPrompt() {
     try {
         const notesBlock = notesInjectBlock();
         if (notesBlock) p += `\n${notesBlock}\n`;
-    } catch (e) { /* ignore */ }
-    try {
-        const cycleBlock = cycleInjectBlock(rpToday());
-        if (cycleBlock) p += `\n${cycleBlock}\n`;
     } catch (e) { /* ignore */ }
     // Прямой эфир — состояние «прямо сейчас», а не история: живёт только пока
     // стрим не завершён
