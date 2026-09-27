@@ -553,6 +553,9 @@
     color: var(--gp-text-dim);
     margin: 2px 6px 4px;
 }
+.gp-bubble-status { opacity: .85; }
+.gp-status-seen { color: var(--gp-accent-a, #6a8dff); }
+.gp-status-delivered { color: var(--gp-text-dim); }
 
 /* ═══ Реакции на сообщения ═══ */
 .gp-bubble { position: relative; } /* якорь чипа реакции */
