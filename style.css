@@ -1384,6 +1384,40 @@
 .gp-ig-pick-has { border-style: solid; padding: 0; }
 .gp-ig-pick-has img { width: 100%; height: 100%; object-fit: cover; }
 
+/* ═══ Instagram profile (grid view) ═══ */
+.gp-ig-profile-head {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 14px;
+}
+.gp-ig-profile-avatar { width: 76px; height: 76px; font-size: 26px; flex: none; }
+.gp-ig-profile-info { flex: 1; min-width: 0; }
+.gp-ig-profile-name { font-weight: 700; font-size: 15px; line-height: 1.25; }
+.gp-ig-profile-handle { font-size: 11.5px; opacity: 0.55; margin-bottom: 8px; }
+.gp-ig-profile-stats { display: flex; gap: 18px; }
+.gp-ig-profile-stat { display: flex; flex-direction: column; font-size: 11.5px; }
+.gp-ig-profile-stat b { font-size: 14px; }
+.gp-ig-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    padding: 2px;
+}
+.gp-ig-grid-item {
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    background: rgba(0,0,0,0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+}
+.gp-ig-grid-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gp-ig-grid-item-gen { color: rgba(255,255,255,0.85); font-size: 18px; }
+.gp-ig-grid-empty { grid-column: 1 / -1; }
+
 /* ═══ Тост ═══
    Общий каркас: голова (иконка или аватар), тело в две строки, время и
    кольцо-таймер. Стиль ниже включает нужное и прячет лишнее. */
