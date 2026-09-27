@@ -1,4 +1,3 @@
-
 import { eventSource, event_types, saveSettingsDebounced } from '../../../../script.js';
 import { getSettings, GP_VERSION, invalidateChatCache, factoryReset, wipePhoneTraces } from './state.js';
 import { updatePhoneInjection } from './prompts.js';
@@ -33,10 +32,6 @@ function setupSettingsPanel() {
             <span class="gp-settings-status-dot" aria-hidden="true"></span>
             <span><b>Телефон</b><small id="gp-settings-status"></small></span>
         </div>
-        <select id="gp-set-lang" class="text_pole gp-settings-language" aria-label="Язык / Language">
-            <option value="ru" ${s.lang !== 'en' ? 'selected' : ''}>Русский</option>
-            <option value="en" ${s.lang === 'en' ? 'selected' : ''}>English</option>
-        </select>
         <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
     </div>
     <div class="inline-drawer-content gp-settings-body">
@@ -170,26 +165,17 @@ function setupSettingsPanel() {
             saveSettingsDebounced();
         });
     }
-    // Перевод панели (en) — оригиналы хранятся на нодах, переключение обратимо
+    // Личная версия: язык всегда en, переключатель убран — перевод панели
+    // остаётся один раз, «обратимости» больше не нужно.
     const translatePanel = () => { try { trDom(document.getElementById('gp-settings-drawer')); } catch (e) { /* ignore */ } };
     const updatePanelStatus = () => {
         const enabled = getSettings().isEnabled;
         const status = document.getElementById('gp-settings-status');
         document.getElementById('gp-settings-drawer')?.classList.toggle('gp-settings-disabled', !enabled);
-        if (status) status.textContent = getSettings().lang === 'en'
-            ? (enabled ? 'Enabled' : 'Disabled')
-            : (enabled ? 'Включён' : 'Выключен');
+        if (status) status.textContent = enabled ? 'Enabled' : 'Disabled';
     };
-    $('#gp-set-lang').on('click mousedown', event => event.stopPropagation());
     translatePanel();
     updatePanelStatus();
-    $('#gp-set-lang').on('change', function () {
-        getSettings().lang = this.value === 'en' ? 'en' : 'ru';
-        saveSettingsDebounced();
-        translatePanel();
-        updatePanelStatus();
-        if (isPhoneOpen()) render();
-    });
     $('#gp-set-enabled').on('change', function () {
         getSettings().isEnabled = this.checked;
         saveSettingsDebounced();
