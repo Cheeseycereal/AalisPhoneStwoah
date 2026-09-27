@@ -3990,12 +3990,6 @@ body.gp-theme-minimal .gp-toast-ava {
 .gp-note-meta .gp-tw-time { flex: 1 1 auto; }
 .gp-note-eye { width: 28px; height: 28px; font-size: 11px; }
 
-/* ═══ Cycle ═══ */
-.gp-app-cycle { background: linear-gradient(140deg, rgba(255, 105, 180, .4), rgba(199, 21, 133, .5)); }
-.gp-tag-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.gp-tag-chip { padding: 5px 10px; border-radius: 999px; border: 1px solid var(--gp-border-soft); background: var(--gp-glass); color: var(--gp-text); font-size: 11.5px; cursor: pointer; }
-.gp-tag-chip.gp-active { border-color: rgba(var(--gp-accent-a-rgb), .6); background: rgba(var(--gp-accent-a-rgb), .25); }
-
 /* Отчёт последних действий телефона (панель настроек) */
 .gp-report-box {
     max-height: 260px; overflow: auto; margin: 6px 0 0;
