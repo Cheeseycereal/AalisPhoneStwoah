@@ -127,7 +127,7 @@ export async function donateToStream(id, amount, text) {
     amount = Math.round(Number(amount) || 0);
     if (!s || amount <= 0) throw new Error('Сумма доната должна быть больше нуля');
     if (getBank().balance < amount) throw new Error('Не хватает денег на счету');
-    addTransaction({ amount: -amount, label: `Донат: ${s.streamer}`, category: 'донат', silent: true });
+    addTransaction({ amount: -amount, label: `Donation: ${s.streamer}`, category: 'донат', silent: true });
     return tickStream(id, text || null, { amount });
 }
 
@@ -172,7 +172,7 @@ export async function tickMyStream(userLine = null) {
             if (amt <= 0) continue;
             const from = String(d.from || 'зритель').slice(0, 32);
             const dText = String(d.text || '').slice(0, 200);
-            addTransaction({ amount: amt, label: `Донат от ${from}`, category: 'стрим', silent: true });
+            addTransaction({ amount: amt, label: `Donation from ${from}`, category: 'стрим', silent: true });
             my.donTotal = (my.donTotal || 0) + amt;
             my.chat = [...my.chat, { id: genId(), author: from, text: dText, don: amt }].slice(-60);
             alerts.push({ from, amount: amt, text: dText });
