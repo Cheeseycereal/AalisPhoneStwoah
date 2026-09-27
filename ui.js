@@ -69,6 +69,8 @@ let currentScreen = 'home';     // + 'of' | 'ofnew' | 'ofview'
 let currentThreadKey = null;
 let currentTweetId = null;
 let currentPostId = null;
+let currentIgProfileAk = null;  // чей грид сейчас открыт: 'user' | 'contact:...'
+let _igViewReturnTo = 'ig';     // куда вернуться из открытого поста: 'ig' | 'igprofile'
 let typingKey = null;           // тред, в котором «печатает…»
 let sending = false;
 let _smsDraftImage = null;      // фото, приложенное к смс (dataURL до отправки)
@@ -660,6 +662,7 @@ export function render() {
     else if (currentScreen === 'tw') renderTw(screen);
     else if (currentScreen === 'twthread' && currentTweetId) renderTwThread(screen);
     else if (currentScreen === 'ig') renderIg(screen);
+    else if (currentScreen === 'igprofile' && currentIgProfileAk) renderIgProfile(screen);
     else if (currentScreen === 'igview' && currentPostId) renderIgView(screen);
     else if (currentScreen === 'ignew') renderIgNew(screen);
     else if (currentScreen === 'ignewstory') renderIgNewStory(screen);
@@ -2852,8 +2855,8 @@ function igCard(p, { clickable = true } = {}) {
     return `
     <div class="gp-ig-card" data-post="${esc(p.id)}">
         <div class="gp-ig-head">
-            ${avatarHtml(p.author, avatarForAuthor(p.ak), 'gp-avatar gp-avatar-xs')}
-            <span class="gp-ig-nameblock">
+            <span class="gp-clickable" data-open-igprofile="${esc(p.ak)}">${avatarHtml(p.author, avatarForAuthor(p.ak), 'gp-avatar gp-avatar-xs')}</span>
+            <span class="gp-ig-nameblock gp-clickable" data-open-igprofile="${esc(p.ak)}">
                 <span class="gp-ig-name">${esc(p.author)}</span>
                 <span class="gp-ig-handle">${esc(handle)}</span>
             </span>
@@ -2876,6 +2879,11 @@ function igCard(p, { clickable = true } = {}) {
 
 function bindIgCardActions(root) {
     bindSocialSystemLinks(root);
+    root.querySelectorAll('[data-open-igprofile]').forEach(b => b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        currentIgProfileAk = b.getAttribute('data-open-igprofile');
+        goto('igprofile');
+    }));
     root.querySelectorAll('[data-share-ig]').forEach(b => b.addEventListener('click', (e) => {
         e.stopPropagation();
         const id = b.getAttribute('data-share-ig');
@@ -2956,10 +2964,63 @@ function bindIgCardActions(root) {
             toast(`Не получилось: ${String(err?.message || err).slice(0, 60)}`, 'fa-circle-exclamation');
         } finally { genBusy = false; render(); }
     }));
-    const open = (id) => { currentPostId = id; goto('igview'); };
+    const open = (id) => { currentPostId = id; _igViewReturnTo = 'ig'; goto('igview'); };
     root.querySelectorAll('[data-open-ig]').forEach(b => b.addEventListener('click', () => open(b.getAttribute('data-open-ig'))));
     root.querySelectorAll('[data-open-ig2]').forEach(b => b.addEventListener('click', (e) => {
         e.stopPropagation(); open(b.getAttribute('data-open-ig2'));
+    }));
+}
+
+function igGridThumb(p) {
+    if (p.image) {
+        const src = p.image.startsWith('data:') ? p.image : p.image + (p.image.includes('?') ? '&' : '?') + 't=' + (p._imgTs || '0');
+        return `<div class="gp-ig-grid-item" data-open-ig="${esc(p.id)}"><img src="${esc(src)}" alt=""></div>`;
+    }
+    return `<div class="gp-ig-grid-item gp-ig-grid-item-gen" data-open-ig="${esc(p.id)}" style="${avatarStyle(p.author + (p.imgDesc || ''))}">${ic('fa-image')}</div>`;
+}
+
+function renderIgProfile(screen) {
+    currentScreen = 'igprofile';
+    const ak = currentIgProfileAk;
+    const posts = getIgPosts().filter(p => p.ak === ak);
+    const isUser = ak === 'user';
+    const author = posts[0]?.author || (isUser ? getUserName() : 'Unknown');
+    const handle = handleFor(ak, author);
+    const totalLikes = posts.reduce((sum, p) => sum + (p.likes || 0), 0);
+    const s = getSocial();
+    const followers = isUser ? compactNum(s.socialProfiles?.instagram?.followers) : null;
+
+    setHtmlKeepScroll(screen, '.gp-feed', `
+        <div class="gp-header gp-thread-header">
+            <button class="gp-iconbtn" id="gp-back">${ic('fa-chevron-left')}</button>
+            <div class="gp-title gp-title-app">${esc(handle)}</div>
+            <span style="width:32px"></span>
+        </div>
+        <div class="gp-feed">
+            <div class="gp-ig-profile-head">
+                ${avatarHtml(author, avatarForAuthor(ak), 'gp-avatar gp-ig-profile-avatar')}
+                <div class="gp-ig-profile-info">
+                    <div class="gp-ig-profile-name">${esc(author)}</div>
+                    <div class="gp-ig-profile-handle">${esc(handle)}</div>
+                    <div class="gp-ig-profile-stats">
+                        <span class="gp-ig-profile-stat"><b>${posts.length}</b>Posts</span>
+                        <span class="gp-ig-profile-stat"><b>${compactNum(totalLikes)}</b>Likes</span>
+                        ${followers !== null ? `<span class="gp-ig-profile-stat"><b>${followers}</b>Followers</span>` : ''}
+                    </div>
+                </div>
+            </div>
+            <div class="gp-ig-grid">
+                ${posts.length === 0
+                    ? `<div class="gp-empty gp-ig-grid-empty"><div class="gp-empty-icon">${brand('fa-instagram')}</div><div class="gp-empty-title">No posts yet</div></div>`
+                    : posts.map(p => igGridThumb(p)).join('')}
+            </div>
+        </div>`);
+
+    screen.querySelector('#gp-back')?.addEventListener('click', () => goto('ig'));
+    screen.querySelectorAll('[data-open-ig]').forEach(b => b.addEventListener('click', () => {
+        currentPostId = b.getAttribute('data-open-ig');
+        _igViewReturnTo = 'igprofile';
+        goto('igview');
     }));
 }
 
@@ -2973,6 +3034,7 @@ function renderIg(screen) {
             <button class="gp-iconbtn" id="gp-back">${ic('fa-chevron-left')}</button>
             <div class="gp-title gp-title-app">${brand('fa-instagram')}</div>
             <button class="gp-iconbtn" data-open-social title="Профиль и задания">${ic('fa-chart-line')}</button>
+            <button class="gp-iconbtn" id="gp-ig-myprofile" title="Мой профиль (сетка)">${ic('fa-table-cells')}</button>
             <button class="gp-iconbtn" id="gp-ig-new" title="Новый пост">${ic('fa-plus')}</button>
             <button class="gp-iconbtn" id="gp-ig-refresh" title="Пересобрать ленту заново" ${genBusy ? 'disabled' : ''}>${ic('fa-rotate')}</button>
             <button class="gp-iconbtn" id="gp-ig-gen" title="Дописать в ленту" ${genBusy ? 'disabled' : ''}>${genBusy ? ic('fa-spinner fa-spin') : ic('fa-wand-magic-sparkles')}</button>
@@ -2987,6 +3049,7 @@ function renderIg(screen) {
     screen.querySelector('#gp-back')?.addEventListener('click', () => goto('home'));
     bindSocialSystemLinks(screen);
     screen.querySelector('#gp-ig-new')?.addEventListener('click', () => goto('ignew'));
+    screen.querySelector('#gp-ig-myprofile')?.addEventListener('click', () => { currentIgProfileAk = 'user'; goto('igprofile'); });
     screen.querySelector('#gp-ig-story-me')?.addEventListener('click', () => {
         _storyAuthor = null; // свои
         if (activeStories().some(s => s.ak === 'user')) { _storyIdx = 0; goto('igstory'); }
@@ -3033,7 +3096,7 @@ function renderIg(screen) {
 
 function renderIgView(screen) {
     const p = getIgPosts().find(x => x.id === currentPostId);
-    if (!p) { goto('ig'); return; }
+    if (!p) { goto(_igViewReturnTo); return; }
     const comments = p.comments || [];
     const canAuthorReply = typeof p.ak === 'string' && p.ak.startsWith('contact:');
 
@@ -3073,7 +3136,7 @@ function renderIgView(screen) {
             <button class="gp-send" id="gp-ig-reply" ${sending ? 'disabled' : ''}>${ic('fa-paper-plane')}</button>
         </div>`);
 
-    screen.querySelector('#gp-back')?.addEventListener('click', () => goto('ig'));
+    screen.querySelector('#gp-back')?.addEventListener('click', () => goto(_igViewReturnTo));
     bindIgCardActions(screen);
     bindDescEdit(screen, p);
 
@@ -4425,13 +4488,14 @@ function renderShopOrders(screen) {
     }));
 }
 
-// ═══ КАЗИНО ═══
+// ═══ CASINO ═══
 
 let _casinoBet = 100;
 let _casinoLast = null;
 let _casinoMode = 'slots';
-// Сессия казино: копим спины и пишем ИТОГ одной строкой в журнал при выходе
-// (каждый спин отдельно — спам в чате; крупный куш логируется сразу)
+// Casino session: spins accumulate and get written to the log as one summary
+// line on exit (logging every spin would spam the chat; a big jackpot still
+// logs immediately)
 let _casinoSession = null;
 
 function casinoTrack(bet, win) {
@@ -4446,8 +4510,8 @@ function flushCasinoSession() {
     _casinoSession = null;
     if (!s || !s.spins) return;
     const net = s.won - s.wagered;
-    const outcome = net > 0 ? `в плюсе на ${fmtMoney(net)}` : net < 0 ? `в минусе на ${fmtMoney(-net)}` : 'вышла в ноль';
-    logSocialToChat(`${getUserName()} играет в онлайн-казино с телефона: ставок на ${fmtMoney(s.wagered)} (${s.spins} раунд.), итог — ${outcome}.`);
+    const outcome = net > 0 ? `up ${fmtMoney(net)}` : net < 0 ? `down ${fmtMoney(-net)}` : 'broke even';
+    logSocialToChat(`${getUserName()} plays the online casino from their phone: ${fmtMoney(s.wagered)} wagered (${s.spins} round${s.spins === 1 ? '' : 's'}), ended up ${outcome}.`);
     applyChatHiding();
 }
 let _casinoBusy = false;
@@ -4496,45 +4560,45 @@ function renderCasino(screen) {
     const st = casinoStats();
     const last = _casinoLast;
     const slotResult = last?.kind === 'slots'
-        ? (last.win > 0 ? `Выигрыш ${fmtMoney(last.win)}` : 'Комбинация не сыграла')
-        : 'Собери три одинаковых символа';
+        ? (last.win > 0 ? `Win ${fmtMoney(last.win)}` : 'No match')
+        : 'Match three symbols';
     const rouletteResult = last?.kind === 'roulette'
-        ? `Выпало ${last.result} · ${last.win > 0 ? `выигрыш ${fmtMoney(last.win)}` : 'ставка не сыграла'}`
-        : 'Выбери ставку и запусти колесо';
+        ? `Landed on ${last.result} · ${last.win > 0 ? `win ${fmtMoney(last.win)}` : 'bet lost'}`
+        : 'Pick a bet and spin the wheel';
     const rouletteBetLabel = _casinoRouletteBet.type === 'num'
-        ? `Число ${_casinoRouletteBet.number} · ×36`
-        : `${_casinoRouletteBet.type === 'red' ? 'Красное' : 'Чёрное'} · ×2`;
+        ? `Number ${_casinoRouletteBet.number} · ×36`
+        : `${_casinoRouletteBet.type === 'red' ? 'Red' : 'Black'} · ×2`;
 
     setHtmlKeepScroll(screen, '.gp-casino-scroll', `
         <div class="gp-header gp-thread-header">
             <button class="gp-iconbtn" id="gp-back">${ic('fa-chevron-left')}</button>
-            <div class="gp-title gp-title-app gp-casino-title">Игровой зал</div>
+            <div class="gp-title gp-title-app gp-casino-title">Casino</div>
             <span style="width:32px"></span>
         </div>
-        <div class="gp-casino-balance"><span>Баланс</span><b>${esc(fmtMoney(b.balance))}</b></div>
+        <div class="gp-casino-balance"><span>Balance</span><b>${esc(fmtMoney(b.balance))}</b></div>
         <div class="gp-casino-scroll">
-            <div class="gp-casino-tabs" role="tablist" aria-label="Игры">
-                <button class="gp-casino-tab ${_casinoMode === 'slots' ? 'gp-active' : ''}" data-casino-mode="slots">Слоты</button>
-                <button class="gp-casino-tab ${_casinoMode === 'roulette' ? 'gp-active' : ''}" data-casino-mode="roulette">Рулетка</button>
+            <div class="gp-casino-tabs" role="tablist" aria-label="Games">
+                <button class="gp-casino-tab ${_casinoMode === 'slots' ? 'gp-active' : ''}" data-casino-mode="slots">Slots</button>
+                <button class="gp-casino-tab ${_casinoMode === 'roulette' ? 'gp-active' : ''}" data-casino-mode="roulette">Roulette</button>
             </div>
             ${_casinoMode === 'slots' ? `
                 <section class="gp-casino-game gp-casino-slots">
-                    <div class="gp-casino-game-head"><b>Лунный клуб</b><span>3 барабана</span></div>
+                    <div class="gp-casino-game-head"><b>Moonlight Club</b><span>3 reels</span></div>
                     <div class="gp-casino-machine ${_casinoBusy ? 'gp-spinning' : ''}">
                         ${_casinoReels.map((symbol, i) => `<div class="gp-casino-reel"><div class="gp-casino-reel-strip" style="--reel-delay:${i * 90}ms"><span>${ic(symbol)}</span><span>${ic('fa-star')}</span><span>${ic('fa-gem')}</span><span>${ic('fa-crown')}</span></div></div>`).join('')}
                     </div>
-                    <div class="gp-casino-paytable"><span><b>×200</b> три короны</span><span><b>×50</b> три камня</span><span><b>×4–20</b> другие тройки</span></div>
+                    <div class="gp-casino-paytable"><span><b>×200</b> three crowns</span><span><b>×50</b> three gems</span><span><b>×4–20</b> other triples</span></div>
                     <div class="gp-casino-quickbets">
                         ${[50, 100, 250].map(v => `<button data-casino-bet="${v}" class="${_casinoBet === v ? 'gp-selected' : ''}">${esc(fmtMoney(v))}</button>`).join('')}
                     </div>
                     <div class="gp-casino-actionrow">
-                        <input type="number" id="gp-casino-bet" class="gp-casino-bet" inputmode="numeric" min="1" value="${_casinoBet}" aria-label="Ставка">
-                        <button class="gp-casino-spin" id="gp-slots-spin" ${_casinoBusy ? 'disabled' : ''}>Крутить</button>
+                        <input type="number" id="gp-casino-bet" class="gp-casino-bet" inputmode="numeric" min="1" value="${_casinoBet}" aria-label="Bet">
+                        <button class="gp-casino-spin" id="gp-slots-spin" ${_casinoBusy ? 'disabled' : ''}>Spin</button>
                     </div>
                     <div class="gp-casino-status ${last?.kind === 'slots' && last.win > 0 ? 'gp-win' : ''}">${esc(slotResult)}</div>
                 </section>` : `
                 <section class="gp-casino-game gp-casino-roulette">
-                    <div class="gp-casino-game-head"><b>Европейская рулетка</b><span>0–36</span></div>
+                    <div class="gp-casino-game-head"><b>European Roulette</b><span>0–36</span></div>
                     <div class="gp-casino-wheel-stage">
                         <span class="gp-casino-pointer" aria-hidden="true"></span>
                         <div class="gp-casino-wheel" id="gp-casino-wheel" style="background:conic-gradient(from -4.865deg,${casinoWheelGradient()});transform:rotate(${_casinoWheelRotation}deg)">
@@ -4544,21 +4608,21 @@ function renderCasino(screen) {
                     </div>
                     <div class="gp-casino-lastnums">${_casinoRouletteHistory.map(n => `<span class="gp-roulette-${casinoNumberColor(n)}">${n}</span>`).join('')}</div>
                     <div class="gp-casino-colors">
-                        <button class="gp-casino-color gp-red ${_casinoRouletteBet.type === 'red' ? 'gp-selected' : ''}" data-roul-select="red">Красное ×2</button>
-                        <button class="gp-casino-color gp-black ${_casinoRouletteBet.type === 'black' ? 'gp-selected' : ''}" data-roul-select="black">Чёрное ×2</button>
+                        <button class="gp-casino-color gp-red ${_casinoRouletteBet.type === 'red' ? 'gp-selected' : ''}" data-roul-select="red">Red ×2</button>
+                        <button class="gp-casino-color gp-black ${_casinoRouletteBet.type === 'black' ? 'gp-selected' : ''}" data-roul-select="black">Black ×2</button>
                     </div>
                     <div class="gp-casino-number-grid">${casinoNumberGrid()}</div>
-                    <div class="gp-casino-choice"><span>Ставка</span><b>${rouletteBetLabel}</b></div>
+                    <div class="gp-casino-choice"><span>Bet</span><b>${rouletteBetLabel}</b></div>
                     <div class="gp-casino-actionrow">
-                        <input type="number" id="gp-casino-bet" class="gp-casino-bet" inputmode="numeric" min="1" value="${_casinoBet}" aria-label="Ставка">
-                        <button class="gp-casino-spin" id="gp-roulette-spin" ${_casinoBusy ? 'disabled' : ''}>Крутить</button>
+                        <input type="number" id="gp-casino-bet" class="gp-casino-bet" inputmode="numeric" min="1" value="${_casinoBet}" aria-label="Bet">
+                        <button class="gp-casino-spin" id="gp-roulette-spin" ${_casinoBusy ? 'disabled' : ''}>Spin</button>
                     </div>
                     <div class="gp-casino-status ${last?.kind === 'roulette' && last.win > 0 ? 'gp-win' : ''}">${esc(rouletteResult)}</div>
                 </section>`}
             <div class="gp-casino-stats">
-                <span>Раундов<b>${st.spins}</b></span>
-                <span>Выиграно<b>${esc(fmtMoney(st.won))}</b></span>
-                <span>Лучший куш<b>${esc(fmtMoney(st.bestWin))}</b></span>
+                <span>Rounds<b>${st.spins}</b></span>
+                <span>Won<b>${esc(fmtMoney(st.won))}</b></span>
+                <span>Best win<b>${esc(fmtMoney(st.bestWin))}</b></span>
             </div>
         </div>`);
 
@@ -4567,7 +4631,7 @@ function renderCasino(screen) {
     betInput?.addEventListener('change', () => { _casinoBet = Math.max(1, parseInt(betInput.value) || 100); });
     const getBet = () => {
         const bet = Math.max(1, parseInt(betInput?.value) || 0);
-        if (!canBet(bet)) { toast('Не хватает денег на счету', 'fa-circle-exclamation'); return null; }
+        if (!canBet(bet)) { toast('Not enough money in the account', 'fa-circle-exclamation'); return null; }
         _casinoBet = bet;
         return bet;
     };
@@ -4586,7 +4650,7 @@ function renderCasino(screen) {
         const r = spinSlots(bet); if (!r) return;
         casinoTrack(r.bet, r.win);
         if (r.mult >= 20) {
-            logSocialToChat(`${getUserName()} сорвала куш в онлайн-казино: ${fmtMoney(r.win)} одним спином (слоты, ×${r.mult})!`);
+            logSocialToChat(`${getUserName()} hits the jackpot at the online casino: ${fmtMoney(r.win)} on a single spin (slots, ×${r.mult})!`);
             applyChatHiding();
         }
         _casinoBusy = true;
@@ -4598,7 +4662,7 @@ function renderCasino(screen) {
             _casinoLast = { kind: 'slots', ...r };
             _casinoBusy = false;
             if (currentScreen === 'casino') render();
-            toast(r.win > 0 ? `Выигрыш ${fmtMoney(r.win)}!` : 'Комбинация не сыграла', r.win > 0 ? 'fa-dice' : 'fa-circle-minus');
+            toast(r.win > 0 ? `Win ${fmtMoney(r.win)}!` : 'No match', r.win > 0 ? 'fa-dice' : 'fa-circle-minus');
         }, 1500);
     });
     screen.querySelectorAll('[data-roul-select]').forEach(btn => btn.addEventListener('click', () => {
@@ -4617,7 +4681,7 @@ function renderCasino(screen) {
         const r = spinRoulette(bet, _casinoRouletteBet.type, _casinoRouletteBet.number); if (!r) return;
         casinoTrack(r.bet, r.win);
         if (_casinoRouletteBet.type === 'num' && r.win > 0) {
-            logSocialToChat(`${getUserName()} сорвала куш в онлайн-казино: угадала число ${r.result} в рулетке и взяла ${fmtMoney(r.win)} (×36)!`);
+            logSocialToChat(`${getUserName()} hits the jackpot at the online casino: called the number ${r.result} on roulette and took home ${fmtMoney(r.win)} (×36)!`);
             applyChatHiding();
         }
         const wheel = screen.querySelector('#gp-casino-wheel');
@@ -4634,7 +4698,7 @@ function renderCasino(screen) {
             _casinoLast = { kind: 'roulette', ...r };
             _casinoBusy = false;
             if (currentScreen === 'casino') render();
-            toast(r.win > 0 ? `Выпало ${r.result} — выигрыш ${fmtMoney(r.win)}!` : `Выпало ${r.result}`, r.win > 0 ? 'fa-dice' : 'fa-circle-dot');
+            toast(r.win > 0 ? `Landed on ${r.result} — win ${fmtMoney(r.win)}!` : `Landed on ${r.result}`, r.win > 0 ? 'fa-dice' : 'fa-circle-dot');
         }, 3300);
     });
 }
