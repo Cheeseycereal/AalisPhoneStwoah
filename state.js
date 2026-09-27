@@ -10,8 +10,9 @@ const META_KEY = 'glassphone';
 // ── Глобальные настройки ──
 const defaultSettings = () => ({
     isEnabled: true,
-    // Язык интерфейса: 'ru' | 'en' (переводится и панель настроек, и весь телефон)
-    lang: 'ru',
+    // Личная версия: язык интерфейса зафиксирован в i18n.js (lang() всегда 'en'),
+    // это поле больше ни на что не влияет — оставлено ради совместимости старых сохранений
+    lang: 'en',
     injectPrompt: true,
     showFab: true,
     fabPos: null, // {right, bottom} — сохранённая позиция кнопки
