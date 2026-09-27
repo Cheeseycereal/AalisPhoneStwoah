@@ -1,4 +1,3 @@
-
 import { sendMessageAsUser, Generate, generateQuietPrompt, saveSettingsDebounced, saveChatConditional } from '../../../../script.js';
 import { saveBase64AsFile } from '../../../utils.js';
 import {
@@ -1836,6 +1835,18 @@ function renderThread(screen) {
     markRead(t.key);
     updateFabBadge();
 
+    // Статус «Доставлено/Прочитано» — только для {{user}}'s ПОСЛЕДНЕГО исходящего:
+    // групповые чаты пропускаем (непонятно, кто именно прочитал), а «прочитано»
+    // выводим из самого факта, что персонаж ответил ПОСЛЕ этого сообщения —
+    // без отдельного состояния, чисто по порядку сообщений.
+    let lastOutIdx = -1;
+    if (!t.isGroup) {
+        for (let i = t.messages.length - 1; i >= 0; i--) {
+            if (t.messages[i].dir === 'out') { lastOutIdx = i; break; }
+        }
+    }
+    const seenAfterLastOut = lastOutIdx >= 0 && t.messages.slice(lastOutIdx + 1).some(mm => mm.dir === 'in');
+
     let bubbles = '';
     let lastDay = '';
     for (let mi = 0; mi < t.messages.length; mi++) {
@@ -1878,11 +1889,19 @@ function renderThread(screen) {
         const reactChip = reaction ? `<span class="gp-react-chip">${ic(reaction.icon)}</span>` : '';
         const picker = (_reactPickerFor === mi && _reactPickerKey === t.key)
             ? `<div class="gp-react-picker">${REACTIONS.map(r => `<button data-react="${r.id}" data-react-mi="${mi}" class="${m.react === r.id ? 'gp-selected' : ''}" title="${r.ru}">${ic(r.icon)}</button>`).join('')}</div>` : '';
+        // Статус только на самом последнем «своём» сообщении треда, и не пока
+        // идёт печатание (точки сами по себе уже говорят «увидели, отвечают»)
+        let statusLabel = '';
+        if (mi === lastOutIdx && typingKey !== t.key) {
+            statusLabel = seenAfterLastOut
+                ? `<span class="gp-bubble-status gp-status-seen">${tr('Прочитано')}</span>`
+                : `<span class="gp-bubble-status gp-status-delivered">${tr('Доставлено')}</span>`;
+        }
         bubbles += `
         <div class="gp-bubble-wrap ${m.dir === 'out' ? 'gp-out' : 'gp-in'}${reaction ? ' gp-has-react' : ''}">
             ${picker}
             <div class="gp-bubble${m.voice ? ' gp-bubble-voice' : ''}" data-bmi="${mi}">${senderLabel}${media}${shotHtml(m)}${body}<button class="gp-sms-del" data-smsdel="${mi}" title="Удалить">${ic('fa-xmark')}</button>${reactChip}</div>
-            ${tm ? `<div class="gp-bubble-time">${esc(tm)}</div>` : ''}
+            ${(tm || statusLabel) ? `<div class="gp-bubble-time">${esc(tm)}${statusLabel ? ` · ${statusLabel}` : ''}</div>` : ''}
         </div>`;
     }
 
