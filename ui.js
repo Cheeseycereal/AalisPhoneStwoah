@@ -1860,7 +1860,13 @@ function renderThread(screen) {
             if (t.messages[i].dir === 'out') { lastOutIdx = i; break; }
         }
     }
-    const seenAfterLastOut = lastOutIdx >= 0 && t.messages.slice(lastOutIdx + 1).some(mm => mm.dir === 'in');
+    // «Прочитано» либо потому что персонаж ОТВЕТИЛ после этого сообщения,
+    // либо потому что явно «увидел, но промолчал» (tel:seen) на индексе чата
+    // не раньше самого исходящего — левый-на-прочитанном без нового текста.
+    const seenAfterLastOut = lastOutIdx >= 0 && (
+        t.messages.slice(lastOutIdx + 1).some(mm => mm.dir === 'in')
+        || (Number.isFinite(t.seenIdx) && t.seenIdx >= t.messages[lastOutIdx].idx)
+    );
 
     let bubbles = '';
     let lastDay = '';
