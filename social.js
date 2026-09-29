@@ -32,8 +32,29 @@ export function getSocial() {
     if (typeof s.ofEarned !== 'number') s.ofEarned = 0;
     if (typeof s.ofWallet !== 'number') s.ofWallet = 0; // прежний кошелёк: один раз переезжает в банк (migrateOfWallet)
     if (!Array.isArray(s.seenTags)) s.seenTags = [];
+    if (!s.igProfiles || typeof s.igProfiles !== 'object') s.igProfiles = {};
     ensureSocialSystems(s);
     return s;
+}
+
+// ── Профили других аккаунтов в Instagram (грид другого персонажа) ──
+// Генерируются один раз по запросу (лениво, с подтверждением), не при
+// каждом посте/сторис — иначе это лишний токен-расход на каждого мелькнувшего
+// незнакомца.
+export function getIgProfile(ak) {
+    return getSocial().igProfiles[ak] || null;
+}
+export async function generateIgProfileBio(ak, author) {
+    const prompt = `${await taskHeader(`write a short Instagram bio for ${author}'s profile.`)}
+${contactsBlock()}
+This is the profile page of ${author} as ${getUserName()} would see it in the roleplay. Write ONE short Instagram-style bio line (like a real bio field): a few words to one short sentence, in ${author}'s voice/vibe — can include an emoji-free vibe descriptor, job, or catchphrase, nothing more. ${uiLangLine()} NO quotes. Output ONLY the bio text.`;
+    const raw = await socialGen(prompt, { maxTokens: 60 });
+    const bio = String(raw || '').replace(/<!--[\s\S]*?-->/g, '').replace(/["'«»]/g, '').trim().split('\n')[0].slice(0, 90);
+    if (!bio) return null;
+    const s = getSocial();
+    s.igProfiles[ak] = { bio, author, generatedAt: Date.now() };
+    saveMeta();
+    return s.igProfiles[ak];
 }
 export function getTweets() { return getSocial().tweets; }
 export function getIgPosts() { return getSocial().igPosts; }
