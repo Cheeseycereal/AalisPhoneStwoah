@@ -2625,7 +2625,7 @@ export async function isImageGenAvailable() {
 // endpoint/провайдера, через который телефон реально будет рисовать.
 export async function fetchImageModels() {
     const mod = await loadImageExt();
-    if (!mod) throw new Error('картинко-расширение не найдено');
+    if (!mod) throw new Error('No image backend configured — fill in API type/endpoint/key under Phone-ST\'s Images settings, or install a compatible image-gen extension.');
     const prof = _imgProfile(getSettings().imageGenProfileId);
     const profFields = prof
         ? Object.fromEntries(Object.entries(prof).filter(([k, v]) => k !== 'id' && k !== 'name' && v !== undefined && v !== ''))
@@ -2871,7 +2871,7 @@ export function generatePostImage(post, onStatus = null, cancelKey = null) {
 // (у юзера стоял 16:9). Снимаем оверрайды на время генерации → побеждает наш 1:1.
 async function _generatePostImage(post, onStatus = null, signal = null) {
     const mod = await loadImageExt();
-    if (!mod) throw new Error('Картинко-расширение не найдено и картинко-API не настроен. Установи расширение генерации картинок или пропиши endpoint/key/model в его настройках.');
+    if (!mod) throw new Error('No image backend configured — fill in API type/endpoint/key under Phone-ST\'s Images settings, or install a compatible image-gen extension.');
 
     const nvSettings = (typeof mod.settings?.getSettings === 'function') ? mod.settings.getSettings() : null;
 
@@ -3062,7 +3062,28 @@ export function listImageBuckets() {
     return out;
 }
 
+// Собственная прямая конфигурация Phone-ST (без стороннего расширения):
+// endpoint/apiKey из настроек телефона, модель — общее поле "Image model"
+// (то же, что раньше было чистым оверрайдом модели расширения).
+function ownImgBucket() {
+    const st = getSettings();
+    if (!st.imageApiKey || !st.imageGenModel) return null;
+    const apiType = st.imageApiType || 'openai';
+    if (apiType !== 'naistera' && !st.imageApiEndpoint) return null;
+    return {
+        apiType,
+        endpoint: st.imageApiEndpoint || '',
+        apiKey: st.imageApiKey,
+        model: st.imageGenModel,
+        naisteraModel: st.imageGenModel,
+    };
+}
+
 function imgBucket() {
+    // Собственные настройки телефона побеждают: это то, что юзер прямо
+    // заполнил в Phone-ST — не нужно гадать по чужим расширениям.
+    const own = ownImgBucket();
+    if (own) return own;
     try {
         const all = extension_settings || {};
         // Явный выбор в настройках телефона — когда стоит несколько расширений
@@ -3107,7 +3128,7 @@ async function _generateViaBuiltin(post, { prompt, wantChar, isUserPost, onStatu
     const prof = _imgProfile(st.imageGenProfileId);
     const imgCfg = prof ? { ...cfgBase, ...Object.fromEntries(Object.entries(prof).filter(([k, v]) => k !== 'id' && k !== 'name' && v !== undefined && v !== '')) } : cfgBase;
     const endpoint = String(imgCfg.endpoint || '').trim().replace(/\/$/, '');
-    if (!cfgReady(imgCfg)) throw new Error('Картинко-API не настроен (endpoint/key/model в настройках картинко-расширения)');
+    if (!cfgReady(imgCfg)) throw new Error('Image API not configured (endpoint/key/model missing in Phone-ST\'s Images settings)');
 
     const model = effectiveModel(imgCfg);
     // post.aspect (сторис 9:16, стрим 16:9) важнее глобального квадрата
