@@ -52,6 +52,7 @@ function setupSettingsPanel() {
                 <label class="gp-settings-field"><span>Узнать автора анонимки</span><input type="number" id="gp-set-anonprice" class="text_pole gp-settings-number" min="0" step="100" value="${Number(s.anonRevealPrice) || 2500}"><small>цена первого имени, дальше растёт</small></label>
                 <div class="gp-settings-checks gp-settings-wide">
                     <label><input type="checkbox" id="gp-set-hide" ${s.hideSmsInChat !== false ? 'checked' : ''}><span>Скрывать смс-переписку из ленты чата</span></label>
+                    <label><input type="checkbox" id="gp-set-confirmprofile" ${s.confirmAutoProfile !== false ? 'checked' : ''}><span>Confirm before auto-generating a character's Instagram profile</span></label>
                     <label><input type="checkbox" id="gp-set-scam" ${s.scamEnabled !== false ? 'checked' : ''}><span>Спам и мошенники в смс</span></label>
                     <label><input type="checkbox" id="gp-set-anon" ${s.anonChannel !== false ? 'checked' : ''}><span>Анонимка «Подслушано» в каналах</span></label>
                     <label><input type="checkbox" id="gp-set-prefill" ${s.usePrefill ? 'checked' : ''}><span>Префилл ответа</span></label>
@@ -208,6 +209,10 @@ function setupSettingsPanel() {
         getSettings().hideSmsInChat = this.checked;
         saveSettingsDebounced();
         applyChatHiding();
+    });
+    $('#gp-set-confirmprofile').on('change', function () {
+        getSettings().confirmAutoProfile = this.checked;
+        saveSettingsDebounced();
     });
     // Ник юзера хранится per-chat (в метаданных) — подставляем при открытии панели
     try { $('#gp-set-handle').val(getUserHandle().replace(/^@/, '')); } catch (e) { /* чат ещё не загружен */ }
