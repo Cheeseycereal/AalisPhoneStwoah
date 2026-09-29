@@ -2,7 +2,7 @@ import { eventSource, event_types, saveSettingsDebounced } from '../../../../scr
 import { getSettings, GP_VERSION, invalidateChatCache, factoryReset, wipePhoneTraces } from './state.js';
 import { updatePhoneInjection } from './prompts.js';
 import { initUI, checkNewIncoming, resetIncomingCounters, updateFabBadge, render, isPhoneOpen, closePhone, applySkin, applyWallpaper, applyChatHiding, toast, notifyBankReminders, notifyDeliveries, deliverScamSms } from './ui.js';
-import { harvestSocialTags, setUserHandle, getUserHandle, listIigProfiles, listIigStyles, listImageBuckets, currentExtModel, stripFakeJournal } from './social.js';
+import { harvestSocialTags, setUserHandle, getUserHandle, listIigProfiles, listIigStyles, listImageBuckets, currentExtModel, stripFakeJournal, resetImageExtCache } from './social.js';
 import { harvestBankTags } from './bank.js';
 import { harvestPlanTags } from './plans.js';
 import { harvestChannelTags, harvestAnonTags, harvestAnonBust, ANON_NAME } from './channels.js';
@@ -64,6 +64,14 @@ function setupSettingsPanel() {
         <details class="gp-settings-group">
             <summary><i class="fa-solid fa-image"></i><span><b>Изображения</b><small>Модель, формат и промпты</small></span><i class="fa-solid fa-chevron-down gp-settings-chevron"></i></summary>
             <div class="gp-settings-group-body gp-settings-grid">
+                <div class="gp-settings-wide gp-settings-note">Direct connection — no separate image-gen extension needed. Fill these in and the phone draws its own images.</div>
+                <label class="gp-settings-field"><span>Image API type</span><select id="gp-set-imgapitype" class="text_pole">
+                    <option value="openai">OpenAI-compatible</option>
+                    <option value="gemini">Google Gemini</option>
+                    <option value="naistera">NovelAI (naistera)</option>
+                </select></label>
+                <label class="gp-settings-field"><span>Image API endpoint</span><input type="text" id="gp-set-imgendpoint" class="text_pole" placeholder="https://..."></label>
+                <label class="gp-settings-field gp-settings-wide"><span>Image API key</span><input type="password" id="gp-set-imgkey" class="text_pole" placeholder="sk-..." autocomplete="new-password"></label>
                 <label class="gp-settings-field gp-settings-wide"><span>Модель картинок</span><span class="gp-settings-control-row"><input type="text" id="gp-set-imgmodel" class="text_pole" list="gp-imgmodels" placeholder="авто"><datalist id="gp-imgmodels"></datalist><button class="menu_button gp-settings-icon-button" id="gp-imgmodel-refresh" type="button" title="Загрузить список моделей" aria-label="Загрузить список моделей"><i class="fa-solid fa-rotate"></i></button></span></label>
                 <label class="gp-settings-field gp-hidden" id="gp-imgcfg-row"><span>Картинко-расширение</span><select id="gp-set-imgcfg" class="text_pole"></select></label>
                 <label class="gp-settings-field"><span>Профиль картинко-расширения</span><select id="gp-set-imgprofile" class="text_pole"></select></label>
@@ -104,6 +112,9 @@ function setupSettingsPanel() {
     $('#extensions_settings2').append(html);
     // Значения назначаются как свойства DOM, не интерполируются в HTML:
     // кавычки и </textarea> в пользовательских промптах/CSS безопасны.
+    $('#gp-set-imgapitype').val(s.imageApiType || 'openai');
+    $('#gp-set-imgendpoint').val(s.imageApiEndpoint || '');
+    $('#gp-set-imgkey').val(s.imageApiKey || '');
     $('#gp-set-imgmodel').val(s.imageGenModel || '');
     $('#gp-set-imgprompt-ig').val(s.imgPromptIg || '');
     $('#gp-set-imgprompt-of').val(s.imgPromptOf || '');
@@ -231,6 +242,22 @@ function setupSettingsPanel() {
         // телефон перестанет держаться за выбранную здесь
         st.imageGenModelBase = st.imageGenModel ? (currentExtModel() || '') : '';
         saveSettingsDebounced();
+        resetImageExtCache();
+    });
+    $('#gp-set-imgapitype').on('change', function () {
+        getSettings().imageApiType = this.value;
+        saveSettingsDebounced();
+        resetImageExtCache();
+    });
+    $('#gp-set-imgendpoint').on('change', function () {
+        getSettings().imageApiEndpoint = this.value.trim();
+        saveSettingsDebounced();
+        resetImageExtCache();
+    });
+    $('#gp-set-imgkey').on('change', function () {
+        getSettings().imageApiKey = this.value.trim();
+        saveSettingsDebounced();
+        resetImageExtCache();
     });
     // Список моделей — из автоопределённого картинко-расширения
     $('#gp-imgmodel-refresh').on('click', async function () {
