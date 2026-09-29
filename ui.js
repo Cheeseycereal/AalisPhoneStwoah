@@ -25,7 +25,7 @@ import {
     handleFor, setContactHandle, setUserHandle, getUserHandle, describePostImage, generateSmsPhotoReply, logSocialToChat, getSocialJournalEntries, logIgPost, logFeedDigest,
     settleSocialPost, maybeGenerateStoryEvent, resolveStoryEvent, generateAdvertisingOffers,
     getStories, activeStories, addStory, deleteStory, bumpStoryViews, toggleStoryLike, generateContactStories, generateStoryReactions,
-    generateRepLabel, generateGroupChats,
+    generateRepLabel, generateGroupChats, getIgProfile, generateIgProfileBio,
     generateChannels, generateChannelPosts, generateChannelComments, generateMyChannelFeedback, generatePersonChannel,
     generateAnonFeed, generateAnonComments, resolveAnonAuthor, generateTinderDeck,
 } from './social.js';
@@ -71,6 +71,7 @@ let currentTweetId = null;
 let currentPostId = null;
 let currentIgProfileAk = null;  // чей грид сейчас открыт: 'user' | 'contact:...'
 let _igViewReturnTo = 'ig';     // куда вернуться из открытого поста: 'ig' | 'igprofile'
+let _igProfileBioBusy = false;
 let typingKey = null;           // тред, в котором «печатает…»
 let sending = false;
 let _smsDraftImage = null;      // фото, приложенное к смс (dataURL до отправки)
@@ -663,6 +664,7 @@ export function render() {
     else if (currentScreen === 'twthread' && currentTweetId) renderTwThread(screen);
     else if (currentScreen === 'ig') renderIg(screen);
     else if (currentScreen === 'igprofile' && currentIgProfileAk) renderIgProfile(screen);
+    else if (currentScreen === 'igfollowing') renderIgFollowing(screen);
     else if (currentScreen === 'igview' && currentPostId) renderIgView(screen);
     else if (currentScreen === 'ignew') renderIgNew(screen);
     else if (currentScreen === 'ignewstory') renderIgNewStory(screen);
@@ -2989,6 +2991,8 @@ function renderIgProfile(screen) {
     const totalLikes = posts.reduce((sum, p) => sum + (p.likes || 0), 0);
     const s = getSocial();
     const followers = isUser ? compactNum(s.socialProfiles?.instagram?.followers) : null;
+    const followingCount = isUser ? igFollowingList().length : null;
+    const profile = isUser ? null : getIgProfile(ak);
 
     setHtmlKeepScroll(screen, '.gp-feed', `
         <div class="gp-header gp-thread-header">
@@ -3002,10 +3006,14 @@ function renderIgProfile(screen) {
                 <div class="gp-ig-profile-info">
                     <div class="gp-ig-profile-name">${esc(author)}</div>
                     <div class="gp-ig-profile-handle">${esc(handle)}</div>
+                    ${!isUser ? (profile?.bio
+                        ? `<div class="gp-ig-profile-bio">${esc(profile.bio)}</div>`
+                        : `<button class="gp-ig-profile-genbio" id="gp-ig-genbio" ${_igProfileBioBusy ? 'disabled' : ''}>${_igProfileBioBusy ? ic('fa-spinner fa-spin') : ic('fa-wand-magic-sparkles')} ${_igProfileBioBusy ? 'Generating...' : 'Generate profile'}</button>`) : ''}
                     <div class="gp-ig-profile-stats">
                         <span class="gp-ig-profile-stat"><b>${posts.length}</b>Posts</span>
                         <span class="gp-ig-profile-stat"><b>${compactNum(totalLikes)}</b>Likes</span>
                         ${followers !== null ? `<span class="gp-ig-profile-stat"><b>${followers}</b>Followers</span>` : ''}
+                        ${followingCount !== null ? `<span class="gp-ig-profile-stat gp-clickable" id="gp-ig-following-open"><b>${followingCount}</b>Following</span>` : ''}
                     </div>
                 </div>
             </div>
@@ -3017,10 +3025,71 @@ function renderIgProfile(screen) {
         </div>`);
 
     screen.querySelector('#gp-back')?.addEventListener('click', () => goto('ig'));
+    screen.querySelector('#gp-ig-following-open')?.addEventListener('click', () => goto('igfollowing'));
     screen.querySelectorAll('[data-open-ig]').forEach(b => b.addEventListener('click', () => {
         currentPostId = b.getAttribute('data-open-ig');
         _igViewReturnTo = 'igprofile';
         goto('igview');
+    }));
+    screen.querySelector('#gp-ig-genbio')?.addEventListener('click', async () => {
+        if (_igProfileBioBusy) return;
+        if (getSettings().confirmAutoProfile !== false && !confirm(`Generate an Instagram profile for ${author}?`)) return;
+        _igProfileBioBusy = true; render();
+        try {
+            await generateIgProfileBio(ak, author);
+        } catch (e) {
+            console.error('[GlassPhone] ig profile bio failed:', e);
+            toast('Generation failed', 'fa-circle-exclamation');
+        } finally {
+            _igProfileBioBusy = false;
+            if (currentScreen === 'igprofile') render();
+        }
+    });
+}
+
+// Кого юзер "фолловит": все авторы постов в его ленте, кроме него самого.
+// Контакты (реальные друзья) — наверх списка, остальные — в порядке
+// первого появления в ленте.
+function igFollowingList() {
+    const seen = new Set();
+    const out = [];
+    for (const p of getIgPosts()) {
+        if (p.ak === 'user' || !p.author || seen.has(p.ak)) continue;
+        seen.add(p.ak);
+        out.push({ ak: p.ak, author: p.author });
+    }
+    out.sort((a, b) => {
+        const af = typeof a.ak === 'string' && a.ak.startsWith('contact:') ? 0 : 1;
+        const bf = typeof b.ak === 'string' && b.ak.startsWith('contact:') ? 0 : 1;
+        return af - bf;
+    });
+    return out;
+}
+
+function renderIgFollowing(screen) {
+    currentScreen = 'igfollowing';
+    const list = igFollowingList();
+    setHtmlKeepScroll(screen, '.gp-feed', `
+        <div class="gp-header gp-thread-header">
+            <button class="gp-iconbtn" id="gp-back">${ic('fa-chevron-left')}</button>
+            <div class="gp-title gp-title-app">Following</div>
+            <span style="width:32px"></span>
+        </div>
+        <div class="gp-feed">
+            ${list.length === 0
+                ? `<div class="gp-empty"><div class="gp-empty-icon">${brand('fa-instagram')}</div><div class="gp-empty-title">Not following anyone yet</div></div>`
+                : list.map(f => `
+                <div class="gp-row gp-clickable" data-open-igprofile="${esc(f.ak)}">
+                    ${avatarHtml(f.author, avatarForAuthor(f.ak), 'gp-avatar gp-avatar-sm')}
+                    <span class="gp-row-name">${esc(f.author)}</span>
+                    ${typeof f.ak === 'string' && f.ak.startsWith('contact:') ? `<span class="gp-ig-following-tag">Friend</span>` : ''}
+                </div>`).join('')}
+        </div>`);
+
+    screen.querySelector('#gp-back')?.addEventListener('click', () => goto('igprofile'));
+    screen.querySelectorAll('[data-open-igprofile]').forEach(b => b.addEventListener('click', () => {
+        currentIgProfileAk = b.getAttribute('data-open-igprofile');
+        goto('igprofile');
     }));
 }
 
@@ -3254,7 +3323,9 @@ let _othersStoriesBusy = false;
 function igStoriesRow() {
     const all = activeStories();
     const mine = all.filter(s => s.ak === 'user');
-    // Чужие сторис группируются по автору — один кружок на человека
+    // Чужие сторис группируются по автору — один кружок на человека.
+    // Контакты (реальные друзья юзера) идут первыми сразу после своей
+    // сторис, случайные аккаунты — following/незнакомцы — после них.
     const others = [];
     const seen = new Set();
     for (const s of all) {
@@ -3262,6 +3333,11 @@ function igStoriesRow() {
         seen.add(s.author);
         others.push(s);
     }
+    others.sort((a, b) => {
+        const af = typeof a.ak === 'string' && a.ak.startsWith('contact:') ? 0 : 1;
+        const bf = typeof b.ak === 'string' && b.ak.startsWith('contact:') ? 0 : 1;
+        return af - bf;
+    });
     const ava = avatarHtml(getUserName(), avatarForAuthor('user'), 'gp-avatar');
     return `
         <div class="gp-igst-row">
