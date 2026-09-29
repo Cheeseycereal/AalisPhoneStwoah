@@ -41,6 +41,7 @@
 #gp-settings-drawer .gp-settings-field textarea.text_pole{height:58px;min-height:58px;resize:vertical}
 #gp-settings-drawer .gp-settings-field>small{font-size:8px;line-height:1.2}
 #gp-settings-drawer .gp-settings-number{max-width:94px}
+#gp-settings-drawer .gp-settings-note{font-size:9.5px;line-height:1.35;color:var(--gp-settings-muted);opacity:.8;padding:0 0 2px}
 #gp-settings-drawer .gp-settings-control-row{display:flex;gap:5px;align-items:stretch}
 #gp-settings-drawer .gp-settings-icon-button{width:34px;min-width:34px;height:34px;margin:0;padding:0;display:grid;place-items:center}
 #gp-settings-drawer .gp-settings-checks{display:flex;flex-direction:column}
