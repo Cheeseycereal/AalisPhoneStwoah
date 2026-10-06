@@ -26,6 +26,9 @@ import {
     settleSocialPost, maybeGenerateStoryEvent, resolveStoryEvent, generateAdvertisingOffers,
     getStories, activeStories, addStory, deleteStory, bumpStoryViews, toggleStoryLike, generateContactStories, generateStoryReactions,
     generateRepLabel, generateGroupChats, getIgProfile, generateIgProfileBio,
+    ImageGenCancelled,
+    getRelationshipStatus, setRelationshipStatus, igIsVerified, buyIgVerification, VERIFY_FOLLOWERS, VERIFY_PRICE,
+    getHighlights, addStoryToHighlight, deleteHighlight, getAnonInbox, deleteAnonQuestion, generateAnonQuestions,
     generateChannels, generateChannelPosts, generateChannelComments, generateMyChannelFeedback, generatePersonChannel,
     generateAnonFeed, generateAnonComments, resolveAnonAuthor, generateTinderDeck,
 } from './social.js';
@@ -72,6 +75,9 @@ let currentPostId = null;
 let currentIgProfileAk = null;  // чей грид сейчас открыт: 'user' | 'contact:...'
 let _igViewReturnTo = 'ig';     // куда вернуться из открытого поста: 'ig' | 'igprofile'
 let _igProfileBioBusy = false;
+let _hlId = null;               // открытый хайлайт
+let _hlIdx = 0;                 // кадр внутри хайлайта
+let _anonBusy = false;
 let typingKey = null;           // тред, в котором «печатает…»
 let sending = false;
 let _smsDraftImage = null;      // фото, приложенное к смс (dataURL до отправки)
@@ -665,6 +671,8 @@ export function render() {
     else if (currentScreen === 'ig') renderIg(screen);
     else if (currentScreen === 'igprofile' && currentIgProfileAk) renderIgProfile(screen);
     else if (currentScreen === 'igfollowing') renderIgFollowing(screen);
+    else if (currentScreen === 'ighighlight' && _hlId) renderIgHighlight(screen);
+    else if (currentScreen === 'iganon') renderIgAnon(screen);
     else if (currentScreen === 'igview' && currentPostId) renderIgView(screen);
     else if (currentScreen === 'ignew') renderIgNew(screen);
     else if (currentScreen === 'ignewstory') renderIgNewStory(screen);
@@ -1118,7 +1126,7 @@ function lockNotifications() {
             { kind: 'tw', n: feedNew('tw', getTweets().length), icon: 'fa-x-twitter', title: 'Twitter', text: 'Новое в ленте' },
             { kind: 'ig', n: feedNew('ig', getIgPosts().length), icon: 'fa-instagram', title: 'Instagram', text: 'Новое в ленте' },
             { kind: 'of', n: feedNew('of', getOfPosts().length), icon: 'fa-heart', title: 'OnlyFans', text: 'Новое в ленте' },
-        ];
+        ].filter(f => f.kind !== 'of' || getSettings().ofEnabled !== false);
         for (const f of feeds) {
             if (f.n > 0) out.push({ icon: f.icon, title: f.title, text: f.text, count: f.n, go: () => goto(f.kind) });
         }
@@ -1234,10 +1242,11 @@ function renderHome(screen) {
                     <div class="gp-app-icon gp-app-events${activeStoryEvent ? ' gp-event-pulse' : ''}">${ic('fa-wand-sparkles')}${activeStoryEvent ? '<span class="gp-app-badge">!</span>' : ''}</div>
                     <div class="gp-app-name">Ивенты</div>
                 </div>
+                ${getSettings().ofEnabled !== false ? `
                 <div class="gp-app" data-app="of">
                     <div class="gp-app-icon gp-app-of">${ic('fa-heart')}</div>
                     <div class="gp-app-name">OnlyFans</div>
-                </div>
+                </div>` : ''}
                 <div class="gp-app" data-app="bank">
                     <div class="gp-app-icon gp-app-bank">${ic('fa-building-columns')}${bankBadgeCount() > 0 ? `<span class="gp-app-badge">${bankBadgeCount()}</span>` : ''}</div>
                     <div class="gp-app-name">Банк</div>
@@ -2859,7 +2868,7 @@ function igCard(p, { clickable = true } = {}) {
         <div class="gp-ig-head">
             <span class="gp-clickable" data-open-igprofile="${esc(p.ak)}">${avatarHtml(p.author, avatarForAuthor(p.ak), 'gp-avatar gp-avatar-xs')}</span>
             <span class="gp-ig-nameblock gp-clickable" data-open-igprofile="${esc(p.ak)}">
-                <span class="gp-ig-name">${esc(p.author)}</span>
+                <span class="gp-ig-name">${esc(p.author)}${isUser && igIsVerified() ? ' ' + verifiedBadge() : ''}</span>
                 <span class="gp-ig-handle">${esc(handle)}</span>
             </span>
             <span class="gp-tw-time">· ${esc(timeAgo(p.time))}</span>
@@ -2973,6 +2982,38 @@ function bindIgCardActions(root) {
     }));
 }
 
+function verifiedBadge() {
+    return `<i class="fa-solid fa-circle-check gp-verified" title="Verified"></i>`;
+}
+
+// Блок под шапкой СВОЕГО профиля: статус отношений, галочка, анонимный ящик, хайлайты
+function igOwnExtrasHtml() {
+    const rel = getRelationshipStatus();
+    const verified = igIsVerified();
+    const hls = getHighlights();
+    const anonCount = getAnonInbox().length;
+    return `
+        <div class="gp-ig-own-extras">
+            <div class="gp-ig-chiprow">
+                <button class="gp-ig-chip" id="gp-ig-rel" title="Relationship status">${ic('fa-heart')} ${rel ? esc(rel) : 'Add relationship status'}${ic('fa-pen')}</button>
+                ${verified
+                    ? `<span class="gp-ig-chip gp-ig-chip-static">${verifiedBadge()} Verified</span>`
+                    : `<button class="gp-ig-chip" id="gp-ig-verify" title="Verified checkmark">${ic('fa-circle-check')} Get verified · ${esc(fmtMoney(VERIFY_PRICE))}</button>`}
+                <button class="gp-ig-chip" id="gp-ig-anon-open">${ic('fa-comment-dots')} Anonymous box${anonCount ? ` · ${anonCount}` : ''}</button>
+            </div>
+            ${hls.length ? `
+            <div class="gp-ig-highlights">
+                ${hls.map(h => {
+                    const first = h.items[0] || {};
+                    const cover = first.image
+                        ? `<img src="${esc(first.image)}" alt="">`
+                        : `<span style="${avatarStyle('hl' + h.title)}" class="gp-ig-hl-fill">${ic('fa-image')}</span>`;
+                    return `<button class="gp-ig-hl" data-hl="${esc(h.id)}"><span class="gp-ig-hl-ring">${cover}</span><i>${esc(h.title)}</i></button>`;
+                }).join('')}
+            </div>` : ''}
+        </div>`;
+}
+
 function igGridThumb(p) {
     if (p.image) {
         const src = p.image.startsWith('data:') ? p.image : p.image + (p.image.includes('?') ? '&' : '?') + 't=' + (p._imgTs || '0');
@@ -3004,7 +3045,7 @@ function renderIgProfile(screen) {
             <div class="gp-ig-profile-head">
                 ${avatarHtml(author, avatarForAuthor(ak), 'gp-avatar gp-ig-profile-avatar')}
                 <div class="gp-ig-profile-info">
-                    <div class="gp-ig-profile-name">${esc(author)}</div>
+                    <div class="gp-ig-profile-name">${esc(author)}${isUser && igIsVerified() ? ' ' + verifiedBadge() : ''}</div>
                     <div class="gp-ig-profile-handle">${esc(handle)}</div>
                     ${!isUser ? (profile?.bio
                         ? `<div class="gp-ig-profile-bio">${esc(profile.bio)}</div>`
@@ -3017,6 +3058,7 @@ function renderIgProfile(screen) {
                     </div>
                 </div>
             </div>
+            ${isUser ? igOwnExtrasHtml() : ''}
             <div class="gp-ig-grid">
                 ${posts.length === 0
                     ? `<div class="gp-empty gp-ig-grid-empty"><div class="gp-empty-icon">${brand('fa-instagram')}</div><div class="gp-empty-title">No posts yet</div></div>`
@@ -3026,6 +3068,25 @@ function renderIgProfile(screen) {
 
     screen.querySelector('#gp-back')?.addEventListener('click', () => goto('ig'));
     screen.querySelector('#gp-ig-following-open')?.addEventListener('click', () => goto('igfollowing'));
+    screen.querySelector('#gp-ig-rel')?.addEventListener('click', () => {
+        const cur = getRelationshipStatus();
+        const v = prompt("Relationship status (e.g. Single, In a relationship, It's complicated). Leave empty to hide it:", cur);
+        if (v === null) return;
+        if (setRelationshipStatus(v)) { updatePhoneInjection(); applyChatHiding(); }
+        render();
+    });
+    screen.querySelector('#gp-ig-verify')?.addEventListener('click', () => {
+        if (!confirm(`Buy a verified checkmark for ${fmtMoney(VERIFY_PRICE)}? (It is also earned for free at ${compactNum(VERIFY_FOLLOWERS)} followers.)`)) return;
+        if (buyIgVerification()) { toast('You are verified', 'fa-circle-check'); applyChatHiding(); }
+        else toast('Not enough money in the account', 'fa-circle-exclamation');
+        render();
+    });
+    screen.querySelector('#gp-ig-anon-open')?.addEventListener('click', () => goto('iganon'));
+    screen.querySelectorAll('[data-hl]').forEach(b => b.addEventListener('click', () => {
+        _hlId = b.getAttribute('data-hl');
+        _hlIdx = 0;
+        goto('ighighlight');
+    }));
     screen.querySelectorAll('[data-open-ig]').forEach(b => b.addEventListener('click', () => {
         currentPostId = b.getAttribute('data-open-ig');
         _igViewReturnTo = 'igprofile';
@@ -3064,6 +3125,96 @@ function igFollowingList() {
         return af - bf;
     });
     return out;
+}
+
+// ── Story highlights viewer (СВОИ; снимок сторис, переживает 24 часа) ──
+function renderIgHighlight(screen) {
+    currentScreen = 'ighighlight';
+    const hl = getHighlights().find(h => h.id === _hlId);
+    if (!hl || !hl.items.length) { goto('igprofile'); return; }
+    if (_hlIdx >= hl.items.length) _hlIdx = hl.items.length - 1;
+    if (_hlIdx < 0) _hlIdx = 0;
+    const it = hl.items[_hlIdx];
+    const me = getUserName();
+    const media = it.image
+        ? `<img class="gp-igst-media" src="${esc(it.image)}" alt="" data-zoom>`
+        : `<div class="gp-igst-media gp-igst-media-gen" style="${avatarStyle('story' + it.imgDesc)}"><span>${ic('fa-image')}</span><i>${esc(it.imgDesc)}</i></div>`;
+    screen.innerHTML = `
+        <div class="gp-igst-viewer">
+            <div class="gp-igst-segments">${hl.items.map((_, i2) => `<span class="${i2 < _hlIdx ? 'gp-done' : i2 === _hlIdx ? 'gp-cur' : ''}"></span>`).join('')}</div>
+            <div class="gp-igst-top">
+                ${avatarHtml(me, avatarForAuthor('user'), 'gp-avatar gp-avatar-sm')}
+                <b>${esc(hl.title)}</b>
+                <span></span>
+                <button class="gp-iconbtn gp-danger" id="gp-hl-del" title="Delete highlight">${ic('fa-trash-can')}</button>
+                <button class="gp-iconbtn" id="gp-hl-close">${ic('fa-xmark')}</button>
+            </div>
+            ${media}
+            ${it.caption ? `<div class="gp-igst-caption">${esc(it.caption)}</div>` : ''}
+            <div class="gp-igst-nav gp-igst-nav-left" id="gp-hl-prev"></div>
+            <div class="gp-igst-nav gp-igst-nav-right" id="gp-hl-next"></div>
+        </div>`;
+    screen.querySelector('#gp-hl-close')?.addEventListener('click', () => goto('igprofile'));
+    screen.querySelector('#gp-hl-del')?.addEventListener('click', () => {
+        if (!confirm(`Delete the highlight "${hl.title}"?`)) return;
+        deleteHighlight(hl.id);
+        goto('igprofile');
+    });
+    screen.querySelector('#gp-hl-prev')?.addEventListener('click', (e) => { e.stopPropagation(); if (_hlIdx > 0) { _hlIdx--; render(); } });
+    screen.querySelector('#gp-hl-next')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (_hlIdx < hl.items.length - 1) { _hlIdx++; render(); } else goto('igprofile');
+    });
+}
+
+// ── Anonymous question box (NGL-style) ──
+function renderIgAnon(screen) {
+    currentScreen = 'iganon';
+    const list = getAnonInbox();
+    setHtmlKeepScroll(screen, '.gp-feed', `
+        <div class="gp-header gp-thread-header">
+            <button class="gp-iconbtn" id="gp-back">${ic('fa-chevron-left')}</button>
+            <div class="gp-title gp-title-app">Anonymous box</div>
+            <button class="gp-iconbtn" id="gp-anon-gen" title="Check for new messages" ${_anonBusy ? 'disabled' : ''}>${_anonBusy ? ic('fa-spinner fa-spin') : ic('fa-rotate')}</button>
+        </div>
+        <div class="gp-feed">
+            ${list.length === 0
+                ? `<div class="gp-empty"><div class="gp-empty-icon">${ic('fa-comment-dots')}</div><div class="gp-empty-title">No anonymous messages</div><div class="gp-empty-text">${ic('fa-rotate')} — see who sent something</div></div>`
+                : list.map(q => `
+                <div class="gp-anon-q">
+                    <div class="gp-anon-q-head"><span>${ic('fa-user-secret')} Anonymous</span><span class="gp-tw-time">${esc(timeAgo(q.time))}</span></div>
+                    <div class="gp-anon-q-text">${esc(q.text)}</div>
+                    <div class="gp-anon-q-actions">
+                        <button class="gp-ig-chip" data-anon-story="${esc(q.id)}">${ic('fa-circle-plus')} Share to story</button>
+                        <button class="gp-ig-chip" data-anon-del="${esc(q.id)}">${ic('fa-xmark')} Delete</button>
+                    </div>
+                </div>`).join('')}
+        </div>`);
+    screen.querySelector('#gp-back')?.addEventListener('click', () => goto('igprofile'));
+    screen.querySelector('#gp-anon-gen')?.addEventListener('click', async () => {
+        if (_anonBusy) return;
+        _anonBusy = true; render();
+        try {
+            const n = await generateAnonQuestions();
+            toast(n > 0 ? `New anonymous messages: ${n}` : 'Nothing new — try again', n > 0 ? 'fa-comment-dots' : 'fa-circle-exclamation');
+        } catch (e) {
+            console.error('[GlassPhone] anon box failed:', e);
+            toast('Generation failed', 'fa-circle-exclamation');
+        } finally {
+            _anonBusy = false;
+            if (currentScreen === 'iganon') render();
+        }
+    });
+    screen.querySelectorAll('[data-anon-del]').forEach(b => b.addEventListener('click', () => {
+        deleteAnonQuestion(b.getAttribute('data-anon-del'));
+        render();
+    }));
+    screen.querySelectorAll('[data-anon-story]').forEach(b => b.addEventListener('click', () => {
+        const q = getAnonInbox().find(x => x.id === b.getAttribute('data-anon-story'));
+        if (!q) return;
+        addStory({ imgDesc: 'Anonymous question box screenshot', caption: `Anonymous: "${q.text}"` });
+        toast('Shared to your story', 'fa-circle-plus');
+    }));
 }
 
 function renderIgFollowing(screen) {
@@ -3454,6 +3605,10 @@ function renderIgNewStory(screen) {
                     const r = await generateStoryReactions(story);
                     if (waitDesc) { logStory(story.imgDesc || ''); applyChatHiding(); }
                     if (r?.reactions?.length) toast(`Реакции на сторис: ${r.reactions.length}`, 'fa-fire');
+                    for (const who of (r?.screenshots || [])) {
+                        toast(`${who} took a screenshot of your story`, 'fa-camera');
+                        try { logSocialToChat(`${who} secretly screenshotted ${getUserName()}'s Instagram story`); applyChatHiding(); } catch (e) { /* ignore */ }
+                    }
                     for (const dm of (r?.dms || [])) {
                         deliverScamSms(dm); // тот же призрак-канал, что у любых входящих смс
                     }
@@ -3508,14 +3663,15 @@ function renderIgStory(screen) {
                 <b>${esc(authorName)}</b>
                 <span>${esc(ageLabel)}</span>
                 ${st.imgDesc ? `<button class="gp-iconbtn" id="gp-st-draw2" title="${st.image ? 'Перегенерировать фото' : 'Нарисовать'}" ${_storyGenBusy ? 'disabled' : ''}>${ic(_storyGenBusy ? 'fa-spinner fa-spin' : (st.image ? 'fa-rotate-right' : 'fa-wand-magic-sparkles'))}</button>` : ''}
+                ${isMine ? `<button class="gp-iconbtn" id="gp-st-hl" title="Add to highlight">${ic('fa-bookmark')}</button>` : ''}
                 ${isMine ? `<button class="gp-iconbtn gp-danger" id="gp-st-del" title="Удалить сторис">${ic('fa-trash-can')}</button>` : ''}
                 <button class="gp-iconbtn" id="gp-st-close">${ic('fa-xmark')}</button>
             </div>
             ${media}
             ${st.caption ? `<div class="gp-igst-caption">${esc(st.caption)}</div>` : ''}
             ${isMine
-                ? `<div class="gp-igst-bottom">${ic('fa-eye')} ${views}${(st.reacts || []).length ? `<span class="gp-igst-reacts">${st.reacts.map(r => `<span class="gp-igst-react">${ic(STORY_REACT_ICONS[r.icon] || 'fa-heart')} ${esc(r.author)}</span>`).join('')}</span>` : ''}</div>`
-                : `<div class="gp-igst-bottom gp-igst-bottom-other"><button class="gp-igst-like${st.liked ? ' gp-on' : ''}" id="gp-st-like" title="Нравится" aria-label="Нравится"><i class="${st.liked ? 'fa-solid' : 'fa-regular'} fa-heart"></i></button></div>`}
+                ? `<div class="gp-igst-bottom">${ic('fa-eye')} ${views}${(st.reacts || []).length ? `<span class="gp-igst-reacts">${st.reacts.map(r => `<span class="gp-igst-react">${ic(STORY_REACT_ICONS[r.icon] || 'fa-heart')} ${esc(r.author)}</span>`).join('')}</span>` : ''}${(st.screenshotBy || []).length ? `<span class="gp-igst-reacts">${st.screenshotBy.map(n => `<span class="gp-igst-react gp-igst-shot">${ic('fa-camera')} ${esc(n)} screenshotted</span>`).join('')}</span>` : ''}</div>`
+                : `<div class="gp-igst-bottom gp-igst-bottom-other">${typeof st.ak === 'string' && st.ak.startsWith('contact:') ? `<input type="text" class="gp-igst-reply" id="gp-st-reply" maxlength="300" placeholder="Reply to ${esc(authorName)}..." autocomplete="off"><button class="gp-igst-like gp-igst-send" id="gp-st-reply-send" title="Send" aria-label="Send">${ic('fa-paper-plane')}</button>` : ''}<button class="gp-igst-like${st.liked ? ' gp-on' : ''}" id="gp-st-like" title="Нравится" aria-label="Нравится"><i class="${st.liked ? 'fa-solid' : 'fa-regular'} fa-heart"></i></button></div>`}
             <div class="gp-igst-nav gp-igst-nav-left" id="gp-st-prev"></div>
             <div class="gp-igst-nav gp-igst-nav-right" id="gp-st-next"></div>
             <button class="gp-igst-arrow gp-igst-arrow-left${_storyIdx <= 0 ? ' gp-off' : ''}" id="gp-st-arrow-prev" title="Назад">${ic('fa-chevron-left')}</button>
@@ -3577,6 +3733,31 @@ function renderIgStory(screen) {
         render();
         if (on) toast(`Нравится: сторис ${authorName}`, 'fa-heart');
     });
+    // Хайлайт: снимок сторис остаётся в профиле после 24 часов
+    screen.querySelector('#gp-st-hl')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const existing = getHighlights().map(h => h.title);
+        const name = prompt(`Highlight name${existing.length ? ` (existing: ${existing.join(', ')} — type one to add to it)` : ''}:`, existing[0] || 'Highlights');
+        if (!name || !name.trim()) return;
+        const hl = addStoryToHighlight(st, name);
+        if (hl) toast(`Saved to "${hl.title}"`, 'fa-bookmark');
+    });
+    // Ответ на сторис контакта = настоящее смс: тред открывается сам
+    const replyInput = screen.querySelector('#gp-st-reply');
+    const sendReply = async (e) => {
+        e?.stopPropagation();
+        const txt = (replyInput?.value || '').trim();
+        if (!txt || sending) return;
+        const key = String(st.ak).slice('contact:'.length);
+        const about = String(st.caption || st.imgDesc || 'story').replace(/\s+/g, ' ').slice(0, 80);
+        replyInput.value = '';
+        currentThreadKey = key;
+        goto('thread');
+        await doSend(key, { name: st.author, text: `*replied to your Instagram story ("${about}")* ${txt}` });
+    };
+    replyInput?.addEventListener('click', (e) => e.stopPropagation());
+    replyInput?.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') sendReply(e); });
+    screen.querySelector('#gp-st-reply-send')?.addEventListener('click', sendReply);
 }
 
 function renderIgNew(screen) {
@@ -7235,7 +7416,7 @@ async function doSend(key, opts = {}) {
     const shot = opts.shot || null;
     if (!text && !_smsDraftImage && !shot) return;
     const t = getThread(key);
-    const name = t ? t.name : key;
+    const name = t ? t.name : (opts.name || key);
     const isGroup = !!t?.isGroup;
     const draftImg = _smsDraftImage;
     _smsDraftImage = null;
