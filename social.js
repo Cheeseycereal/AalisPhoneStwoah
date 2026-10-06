@@ -33,8 +33,104 @@ export function getSocial() {
     if (typeof s.ofWallet !== 'number') s.ofWallet = 0; // прежний кошелёк: один раз переезжает в банк (migrateOfWallet)
     if (!Array.isArray(s.seenTags)) s.seenTags = [];
     if (!s.igProfiles || typeof s.igProfiles !== 'object') s.igProfiles = {};
+    if (!Array.isArray(s.highlights)) s.highlights = [];
+    if (!Array.isArray(s.anonInbox)) s.anonInbox = [];
+    if (typeof s.relationshipStatus !== 'string') s.relationshipStatus = '';
     ensureSocialSystems(s);
     return s;
+}
+
+// ── Relationship status (поле профиля Instagram) ──
+export function getRelationshipStatus() { return getSocial().relationshipStatus || ''; }
+export function setRelationshipStatus(value) {
+    const s = getSocial();
+    const next = String(value || '').trim().slice(0, 40);
+    if (next === (s.relationshipStatus || '')) return false;
+    s.relationshipStatus = next;
+    saveMeta();
+    // Строка в журнал: персонажи в ролевой замечают, что статус поменялся
+    try {
+        logSocialToChat(next
+            ? `${getUserName()} changed their Instagram relationship status to "${next}"`
+            : `${getUserName()} removed the relationship status from their Instagram profile`);
+    } catch (e) { /* ignore */ }
+    return true;
+}
+
+// ── Verified checkmark ──
+// Зарабатывается подписчиками (10k+) или покупается. Хранится флаг покупки;
+// «заработанная» галочка считается на лету от текущего числа подписчиков.
+export const VERIFY_FOLLOWERS = 10000;
+export const VERIFY_PRICE = 199;
+export function igIsVerified() {
+    const s = getSocial();
+    return !!s.igVerified || (Number(s.socialProfiles?.instagram?.followers) || 0) >= VERIFY_FOLLOWERS;
+}
+export function buyIgVerification() {
+    const s = getSocial();
+    if (s.igVerified) return true;
+    const b = getBank();
+    if (b.balance < VERIFY_PRICE) return false;
+    addTransaction({ amount: -VERIFY_PRICE, label: 'Instagram verification', category: 'social', silent: true });
+    s.igVerified = true;
+    saveMeta();
+    try { logSocialToChat(`${getUserName()} bought a verified checkmark for their Instagram account`); } catch (e) { /* ignore */ }
+    return true;
+}
+
+// ── Story highlights: сторис живут 24 ч, хайлайт хранит СНИМОК содержимого ──
+export function getHighlights() { return getSocial().highlights; }
+export function addStoryToHighlight(story, title) {
+    if (!story) return null;
+    const s = getSocial();
+    const name = String(title || '').trim().slice(0, 24) || 'Highlights';
+    let hl = s.highlights.find(h => String(h.title).toLowerCase() === name.toLowerCase());
+    if (!hl) {
+        hl = { id: genId(), title: name, items: [] };
+        s.highlights.push(hl);
+    }
+    hl.items.push({
+        image: story.image || null,
+        imgDesc: story.imgDesc || '',
+        caption: story.caption || '',
+        time: story.time || Date.now(),
+    });
+    saveMeta();
+    return hl;
+}
+export function deleteHighlight(id) {
+    const s = getSocial();
+    s.highlights = s.highlights.filter(h => h.id !== id);
+    saveMeta();
+}
+
+// ── Anonymous question box (NGL-style): незнакомцы пишут юзеру анонимно ──
+export function getAnonInbox() { return getSocial().anonInbox; }
+export function deleteAnonQuestion(id) {
+    const s = getSocial();
+    s.anonInbox = s.anonInbox.filter(q => q.id !== id);
+    saveMeta();
+}
+export async function generateAnonQuestions() {
+    const s = getSocial();
+    const followers = Number(s.socialProfiles?.instagram?.followers) || 0;
+    const prompt = `${await taskHeader(`invent anonymous messages sent to ${getUserName()}'s Instagram anonymous question box (NGL-style).`)}
+The senders are STRANGERS and stay anonymous — never name a roleplay character as the sender and never reveal who wrote it. ${getUserName()} has about ${followers} followers.
+Write 3-5 messages of mixed tone, like real anonymous-box traffic: curious questions, crushes, hot takes, compliments, a rude one, a weird one, something referencing what ${getUserName()} has been posting or doing lately. Phone-typed, short.
+${uiLangLine()}
+${JSON_RULES}
+Format: [{"text":"..."}]`;
+    const arr = await socialGenArray(prompt, { maxTokens: 500, prefill: '[{"text":"' });
+    let added = 0;
+    for (const it of (Array.isArray(arr) ? arr : []).slice(0, 5)) {
+        const text = String(it?.text || '').trim().slice(0, 240);
+        if (!text) continue;
+        s.anonInbox.unshift({ id: genId(), text, time: Date.now() - Math.floor(Math.random() * 3600 * 1000) });
+        added++;
+    }
+    s.anonInbox = s.anonInbox.slice(0, 30);
+    saveMeta();
+    return added;
 }
 
 // ── Профили других аккаунтов в Instagram (грид другого персонажа) ──
@@ -102,9 +198,10 @@ Their contacts who могли увидеть: ${names.join(', ') || 'random foll
 Return:
 ${wantDesc ? '"photo" — one sentence describing what is ACTUALLY on the attached image (who/what, setting, clothes, mood).\n' : ''}"reactions" — 2-6 quick story reactions [{"author":"Имя","icon":"fire|heart|laugh|wow|sad"}] — authors from their contacts (or 1-2 invented followers); icon matches how THAT person would react in-character.
 "dms" — 0-2 direct replies that arrive as SMS on ${getUserName()}'s phone [{"from":"Имя СТРОГО из её контактов","text":"short in-character reply referencing what's ON the story"}] — ONLY if that person would really slide into DMs (close, flirty, worried, provoked); otherwise [].
+"screenshots" — names (STRICTLY from the contacts list) of anyone who would quietly SCREENSHOT this story (obsessed, jealous, saving it, about to show it to someone, building a case). RARE — usually []; at most 1 name.
 ${uiLangLine()}
 ${JSON_RULES}
-Format: [{${wantDesc ? '"photo":"...",' : ''}"reactions":[{"author":"Имя","icon":"fire"}],"dms":[{"from":"Имя","text":"..."}]}]`;
+Format: [{${wantDesc ? '"photo":"...",' : ''}"reactions":[{"author":"Имя","icon":"fire"}],"dms":[{"from":"Имя","text":"..."}],"screenshots":[]}]`;
     const arr = await socialGenArray(prompt, {
         maxTokens: wantDesc ? 900 : 700,
         image: story.image || null,
@@ -127,9 +224,17 @@ Format: [{${wantDesc ? '"photo":"...",' : ''}"reactions":[{"author":"Имя","ic
         .slice(0, 2);
     if (reactions.length) {
         story.reacts = reactions;
-        saveMeta();
     }
-    return { reactions, dms };
+    // Скриншоты: только имена из контактов, максимум один. Хранятся на самой
+    // сторис — владелец видит в просмотрщике, кто сохранил.
+    const known = new Set((m.contacts || []).map(c => String(c.name || '').toLowerCase()));
+    const screenshots = (Array.isArray(r.screenshots) ? r.screenshots : [])
+        .map(x => String(x || '').trim().slice(0, 32))
+        .filter(x => x && known.has(x.toLowerCase()) && !isBanned(x))
+        .slice(0, 1);
+    if (screenshots.length) story.screenshotBy = screenshots;
+    saveMeta();
+    return { reactions, dms, screenshots };
 }
 
 // Чужие сторис: знакомые тоже постят (генерятся, когда юзер выкладывает свою).
@@ -2500,7 +2605,9 @@ export async function generateCommentAvatar(comment) {
         const prompt = `square social-media profile avatar, close-up head-and-shoulders portrait of ${subject}, one person, clean readable face, appearance and clothing typical for the story's country and era, simple unobtrusive background, no text, no logo, no watermark`;
         const temp = { author: comment.author || 'Account', ak: 'random', kind: 'avatar' };
         let src = '';
-        if (mod.builtin) {
+        if (mod.st) {
+            src = await _generateViaST(temp, { prompt });
+        } else if (mod.builtin) {
             src = await _generateViaBuiltin(temp, { prompt, wantChar: false, isUserPost: false, onStatus: null });
         } else {
             const dataUrl = await mod.pipeline.generateImageWithRetry(prompt, null, null, { aspectRatio: '1:1' });
@@ -2566,6 +2673,9 @@ async function probeImageExt(folder, allowIndexFallback) {
 }
 
 async function loadImageExt() {
+    // Режим «встроенная генерация SillyTavern» (/sd): никаких расширений и
+    // ключей искать не нужно — рисует сам ST по своим настройкам.
+    if ((getSettings().imageBackend || 'st') === 'st') return { st: true, folder: '(SillyTavern /sd)' };
     const override = String(getSettings().imageGenExtension || '').replace(/[^a-zA-Z0-9_\-]/g, '');
     // В ключ входят и настройки: без этого «расширение не установлено»
     // залипало в кэше после того, как его настроили или переключили
@@ -2626,6 +2736,7 @@ export async function isImageGenAvailable() {
 export async function fetchImageModels() {
     const mod = await loadImageExt();
     if (!mod) throw new Error('No image backend configured — fill in API type/endpoint/key under Phone-ST\'s Images settings, or install a compatible image-gen extension.');
+    if (mod.st) throw new Error('Image source is SillyTavern — pick the model in ST\'s Image Generation panel.');
     const prof = _imgProfile(getSettings().imageGenProfileId);
     const profFields = prof
         ? Object.fromEntries(Object.entries(prof).filter(([k, v]) => k !== 'id' && k !== 'name' && v !== undefined && v !== ''))
@@ -2926,6 +3037,11 @@ async function _generatePostImage(post, onStatus = null, signal = null) {
         prompt = buildImagePrompt(post, { anonymous, allowChar: wantChar });
     }
 
+    // Встроенная генерация SillyTavern (/sd)
+    if (mod.st) {
+        return _generateViaST(post, { prompt, onStatus });
+    }
+
     // Встроенный драйвер (форки без экспортов)
     if (mod.builtin) {
         return _generateViaBuiltin(post, { prompt, wantChar, isUserPost: userInFrame, onStatus, signal });
@@ -3119,6 +3235,42 @@ async function _fetchB64(url) {
             fr.readAsDataURL(blob);
         });
     } catch (e) { return null; }
+}
+
+// ── Генерация через встроенные Image Generation SillyTavern (/sd) ──
+// Телефон ничего не настраивает сам: команда /sd quiet=true рисует по тем
+// настройкам, что уже стоят в панели Image Generation в ST (источник, модель,
+// стиль, префиксы), и возвращает относительный URL картинки, не постя её в чат.
+// Ограничения режима: аспект и референсы аватаров решает сам ST, а не телефон.
+async function _generateViaST(post, { prompt, onStatus = null } = {}) {
+    const ctx = SillyTavern.getContext();
+    const run = ctx?.executeSlashCommandsWithOptions;
+    if (typeof run !== 'function') {
+        throw new Error('This SillyTavern version cannot run slash commands from extensions — update ST, or switch Image source to "Direct API".');
+    }
+    // Парсер слэш-команд: «|» режет команду, {{...}} раскрываются макросами,
+    // перенос строки и «\» ломают аргумент — вычищаем всё это из промпта
+    const clean = String(prompt || '')
+        .replace(/\|/g, '/').replace(/\\/g, ' ')
+        .replace(/\{\{/g, '{ {').replace(/\}\}/g, '} }')
+        .replace(/\s+/g, ' ').trim();
+    if (!clean) throw new Error('Empty image prompt');
+    onStatus?.('Generating via SillyTavern...');
+    const res = await run(`/sd quiet=true ${clean}`, {
+        handleParserErrors: true, handleExecutionErrors: true, source: 'phone-st',
+    });
+    if (res && typeof res === 'object' && res.isError) {
+        throw new Error(`SillyTavern image generation failed: ${String(res.errorMessage || 'unknown error').slice(0, 150)}`);
+    }
+    let url = String((res && typeof res === 'object' ? res.pipe : res) || '').trim();
+    if (!url) {
+        throw new Error('SillyTavern returned no image — check the Image Generation panel in ST (source, model, and that the extension is enabled).');
+    }
+    if (!/^(https?:|data:|\/)/i.test(url)) url = '/' + url;
+    post.image = url;
+    post._imgTs = Date.now();
+    saveMeta();
+    return url;
 }
 
 async function _generateViaBuiltin(post, { prompt, wantChar, isUserPost, onStatus, signal = null }) {
@@ -3435,10 +3587,15 @@ export function getSocialActivitySummary() {
         // строка о нём держится в инжекте, иначе «прочитать» его станет нечем.
         // Деньги со страницы лежат на банковском счёте и уходят в инжект
         // банковской строкой — отдельной «карты» больше нет
-        const last = s.ofPosts.filter(x => x.ak === 'user')[0];
-        return last
-            ? `- Their PRIVATE subscribers-only page (OnlyFans, ${s.ofSubs || 0} subscribers), latest post ${timeAgo(last.time)} ago: ${ofPostLine(last)}. A character knows this page exists ONLY if the story established that they subscribe or found out — nobody guesses it on their own.`
-            : '';
+        const last = getSettings().ofEnabled !== false ? s.ofPosts.filter(x => x.ak === 'user')[0] : null;
+        const persistent = [];
+        if (s.relationshipStatus) {
+            persistent.push(`- Their Instagram profile lists relationship status: "${s.relationshipStatus}". Characters who follow them may have noticed; it only matters if it fits the story.`);
+        }
+        if (last) {
+            persistent.push(`- Their PRIVATE subscribers-only page (OnlyFans, ${s.ofSubs || 0} subscribers), latest post ${timeAgo(last.time)} ago: ${ofPostLine(last)}. A character knows this page exists ONLY if the story established that they subscribe or found out — nobody guesses it on their own.`);
+        }
+        return persistent.join('\n');
     }
 
     const lines = [];
@@ -3479,7 +3636,10 @@ export function getSocialActivitySummary() {
     lines.push(...interactions.slice(0, 3).map(x => x.line));
 
     // OnlyFans: только последний пост, с пометкой приватности
-    const lastOf = s.ofPosts.filter(p => p.ak === 'user')[0];
+    if (s.relationshipStatus) {
+        lines.push(`- Their Instagram profile lists relationship status: "${s.relationshipStatus}". Characters who follow them may have noticed; it only matters if it fits the story.`);
+    }
+    const lastOf = getSettings().ofEnabled !== false ? s.ofPosts.filter(p => p.ak === 'user')[0] : null;
     if (lastOf) {
         lines.push(`- Their PRIVATE subscribers-only page (OnlyFans, ${s.ofSubs || 0} subscribers), latest post ${timeAgo(lastOf.time)} ago: ${ofPostLine(lastOf)}. A character knows this page exists ONLY if the story established that they subscribe or found out — nobody guesses it on their own.`);
     }
