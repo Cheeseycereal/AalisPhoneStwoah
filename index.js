@@ -53,6 +53,8 @@ function setupSettingsPanel() {
                 <div class="gp-settings-checks gp-settings-wide">
                     <label><input type="checkbox" id="gp-set-hide" ${s.hideSmsInChat !== false ? 'checked' : ''}><span>Скрывать смс-переписку из ленты чата</span></label>
                     <label><input type="checkbox" id="gp-set-confirmprofile" ${s.confirmAutoProfile !== false ? 'checked' : ''}><span>Confirm before auto-generating a character's Instagram profile</span></label>
+                    <label><input type="checkbox" id="gp-set-ofenabled" ${s.ofEnabled !== false ? 'checked' : ''}><span>Show the OnlyFans app</span></label>
+                    <label><input type="checkbox" id="gp-set-groupambient" ${s.groupAmbient ? 'checked' : ''}><span>Active group chats — members text each other without you (uses tokens)</span></label>
                     <label><input type="checkbox" id="gp-set-scam" ${s.scamEnabled !== false ? 'checked' : ''}><span>Спам и мошенники в смс</span></label>
                     <label><input type="checkbox" id="gp-set-anon" ${s.anonChannel !== false ? 'checked' : ''}><span>Анонимка «Подслушано» в каналах</span></label>
                     <label><input type="checkbox" id="gp-set-prefill" ${s.usePrefill ? 'checked' : ''}><span>Префилл ответа</span></label>
@@ -64,18 +66,23 @@ function setupSettingsPanel() {
         <details class="gp-settings-group">
             <summary><i class="fa-solid fa-image"></i><span><b>Изображения</b><small>Модель, формат и промпты</small></span><i class="fa-solid fa-chevron-down gp-settings-chevron"></i></summary>
             <div class="gp-settings-group-body gp-settings-grid">
-                <div class="gp-settings-wide gp-settings-note">Direct connection — no separate image-gen extension needed. Fill these in and the phone draws its own images.</div>
-                <label class="gp-settings-field"><span>Image API type</span><select id="gp-set-imgapitype" class="text_pole">
+                <label class="gp-settings-field gp-settings-wide"><span>Image source</span><select id="gp-set-imgbackend" class="text_pole">
+                    <option value="st">SillyTavern Image Generation (uses your ST settings)</option>
+                    <option value="auto">Direct API / other image extension</option>
+                </select></label>
+                <div class="gp-settings-wide gp-settings-note gp-img-st-note">Uses the Image Generation panel already set up in SillyTavern (source, model, style). Model and aspect ratio are chosen there. Make sure that extension is enabled and works with /sd.</div>
+                <div class="gp-settings-wide gp-settings-note gp-img-direct">Direct connection — no separate image-gen extension needed. Fill these in and the phone draws its own images.</div>
+                <label class="gp-settings-field gp-img-direct"><span>Image API type</span><select id="gp-set-imgapitype" class="text_pole">
                     <option value="openai">OpenAI-compatible</option>
                     <option value="gemini">Google Gemini</option>
                     <option value="naistera">NovelAI (naistera)</option>
                 </select></label>
-                <label class="gp-settings-field"><span>Image API endpoint</span><input type="text" id="gp-set-imgendpoint" class="text_pole" placeholder="https://..."></label>
-                <label class="gp-settings-field gp-settings-wide"><span>Image API key</span><input type="password" id="gp-set-imgkey" class="text_pole" placeholder="sk-..." autocomplete="new-password"></label>
-                <label class="gp-settings-field gp-settings-wide"><span>Модель картинок</span><span class="gp-settings-control-row"><input type="text" id="gp-set-imgmodel" class="text_pole" list="gp-imgmodels" placeholder="авто"><datalist id="gp-imgmodels"></datalist><button class="menu_button gp-settings-icon-button" id="gp-imgmodel-refresh" type="button" title="Загрузить список моделей" aria-label="Загрузить список моделей"><i class="fa-solid fa-rotate"></i></button></span></label>
+                <label class="gp-settings-field gp-img-direct"><span>Image API endpoint</span><input type="text" id="gp-set-imgendpoint" class="text_pole" placeholder="https://..."></label>
+                <label class="gp-settings-field gp-settings-wide gp-img-direct"><span>Image API key</span><input type="password" id="gp-set-imgkey" class="text_pole" placeholder="sk-..." autocomplete="new-password"></label>
+                <label class="gp-settings-field gp-settings-wide gp-img-direct"><span>Модель картинок</span><span class="gp-settings-control-row"><input type="text" id="gp-set-imgmodel" class="text_pole" list="gp-imgmodels" placeholder="авто"><datalist id="gp-imgmodels"></datalist><button class="menu_button gp-settings-icon-button" id="gp-imgmodel-refresh" type="button" title="Загрузить список моделей" aria-label="Загрузить список моделей"><i class="fa-solid fa-rotate"></i></button></span></label>
                 <label class="gp-settings-field gp-hidden" id="gp-imgcfg-row"><span>Картинко-расширение</span><select id="gp-set-imgcfg" class="text_pole"></select></label>
-                <label class="gp-settings-field"><span>Профиль картинко-расширения</span><select id="gp-set-imgprofile" class="text_pole"></select></label>
-                <label class="gp-settings-field"><span>Стиль картинок телефона</span><select id="gp-set-imgstyle" class="text_pole"></select></label>
+                <label class="gp-settings-field gp-img-direct"><span>Профиль картинко-расширения</span><select id="gp-set-imgprofile" class="text_pole"></select></label>
+                <label class="gp-settings-field gp-img-direct"><span>Стиль картинок телефона</span><select id="gp-set-imgstyle" class="text_pole"></select></label>
                 <div class="gp-settings-checks gp-settings-wide">
                     <label><input type="checkbox" id="gp-set-square" ${s.imageGenSquare !== false ? 'checked' : ''}><span>Картинки постов — квадрат 1:1</span></label>
                     <label><input type="checkbox" id="gp-set-tagmode" ${s.imgTagMode ? 'checked' : ''}><span>Booru-теги (для NovelAI/аниме-моделей)</span></label>
@@ -112,6 +119,19 @@ function setupSettingsPanel() {
     $('#extensions_settings2').append(html);
     // Значения назначаются как свойства DOM, не интерполируются в HTML:
     // кавычки и </textarea> в пользовательских промптах/CSS безопасны.
+    $('#gp-set-imgbackend').val(s.imageBackend === 'auto' ? 'auto' : 'st');
+    const syncImgBackendUi = () => {
+        const isSt = ($('#gp-set-imgbackend').val() || 'st') === 'st';
+        $('#gp-settings-drawer .gp-img-direct').toggleClass('gp-hidden', isSt);
+        $('#gp-settings-drawer .gp-img-st-note').toggleClass('gp-hidden', !isSt);
+    };
+    syncImgBackendUi();
+    $('#gp-set-imgbackend').on('change', function () {
+        getSettings().imageBackend = this.value === 'auto' ? 'auto' : 'st';
+        saveSettingsDebounced();
+        resetImageExtCache();
+        syncImgBackendUi();
+    });
     $('#gp-set-imgapitype').val(s.imageApiType || 'openai');
     $('#gp-set-imgendpoint').val(s.imageApiEndpoint || '');
     $('#gp-set-imgkey').val(s.imageApiKey || '');
@@ -224,6 +244,17 @@ function setupSettingsPanel() {
     $('#gp-set-confirmprofile').on('change', function () {
         getSettings().confirmAutoProfile = this.checked;
         saveSettingsDebounced();
+    });
+    $('#gp-set-ofenabled').on('change', function () {
+        getSettings().ofEnabled = this.checked;
+        saveSettingsDebounced();
+        updatePhoneInjection();
+        if (isPhoneOpen()) render();
+    });
+    $('#gp-set-groupambient').on('change', function () {
+        getSettings().groupAmbient = this.checked;
+        saveSettingsDebounced();
+        updatePhoneInjection();
     });
     // Ник юзера хранится per-chat (в метаданных) — подставляем при открытии панели
     try { $('#gp-set-handle').val(getUserHandle().replace(/^@/, '')); } catch (e) { /* чат ещё не загружен */ }
