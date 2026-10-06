@@ -1,5 +1,5 @@
-// Казино: слоты и рулетка на деньги банка. Вся математика локальная и честно
-// казиношная (дом всегда в плюсе на дистанции) — никакого LLM.
+// Casino: slots and roulette played with bank money. All math is local and
+// runs honest house odds (the house is always ahead over time) — no LLM.
 
 import { getMeta, saveMeta } from './state.js';
 import { getBank, addTransaction } from './bank.js';
@@ -20,14 +20,14 @@ export function casinoStats() { return getCasino(); }
 function settle(bet, win, label) {
     const c = getCasino();
     c.spins++;
-    addTransaction({ amount: -bet, label, category: 'казино', silent: true });
+    addTransaction({ amount: -bet, label, category: 'casino', silent: true });
     if (win > 0) {
-        addTransaction({ amount: win, label: `Выигрыш: ${label}`, category: 'казино', silent: true });
+        addTransaction({ amount: win, label: `Win: ${label}`, category: 'casino', silent: true });
         c.won += win;
         if (win > c.bestWin) c.bestWin = win;
     }
-    c.wagered = (c.wagered || 0) + bet;   // всего поставлено (не «проиграно»)
-    c.lost = c.wagered;                    // старое имя оставлено для прежних чатов
+    c.wagered = (c.wagered || 0) + bet;   // total wagered (not "lost")
+    c.lost = c.wagered;                    // old field name kept for existing chats
     saveMeta();
 }
 
@@ -36,11 +36,12 @@ export function canBet(bet) {
     return Number.isFinite(bet) && bet > 0 && b.balance >= bet;
 }
 
-// ── Слоты: 3 барабана, взвешенные символы ──
-// Отдача 89%: дом в плюсе, но джекпоты случаются. Считается как
-// Σ p(комбинация) × множитель — выплаты подобраны под эту сумму, менять их
-// на глаз нельзя: пара лимонов выпадает в каждом пятом спине, и любая
-// выплата за неё уводила автомат в минус (было 115% — казино дарило деньги).
+// ── Slots: 3 reels, weighted symbols ──
+// 89% payout: house stays ahead, but jackpots do happen. Calculated as
+// Σ p(combo) × multiplier — the payouts are tuned to hit that number, don't
+// change them by eye: a pair of lemons lands about one spin in five, and any
+// payout for it pushed the machine into the red (it was 115% — the casino
+// was giving money away).
 const SLOT_SYMBOLS = [
     { icon: 'fa-lemon', w: 30, three: 4, two: 0 },
     { icon: 'fa-heart', w: 25, three: 6, two: 1 },
@@ -67,11 +68,11 @@ export function spinSlots(bet) {
         mult = dup.two;
     }
     const win = Math.round(bet * mult);
-    settle(bet, win, 'Слоты');
+    settle(bet, win, 'Slots');
     return { reels: reels.map(r => r.icon), mult, win, bet };
 }
 
-// ── Рулетка: красное/чёрное (×2, зеро — дом) или число 0-36 (×36) ──
+// ── Roulette: red/black (×2, zero — house) or a number 0-36 (×36) ──
 const RED_NUMBERS = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
 
 export function spinRoulette(bet, betType, betNumber = null) {
@@ -83,6 +84,6 @@ export function spinRoulette(bet, betType, betNumber = null) {
     if (betType === 'red' && color === 'red') win = bet * 2;
     else if (betType === 'black' && color === 'black') win = bet * 2;
     else if (betType === 'num' && Number(betNumber) === result) win = bet * 36;
-    settle(bet, win, 'Рулетка');
+    settle(bet, win, 'Roulette');
     return { result, color, win, bet };
 }
