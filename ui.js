@@ -7566,7 +7566,9 @@ async function doSend(key, opts = {}) {
     const shot = opts.shot || null;
     if (!text && !_smsDraftImage && !shot) return;
     const t = getThread(key);
-    const name = t ? t.name : (opts.name || key);
+    // Always address the ORIGINAL name: a renamed contact's display name used to
+    // leak into the text and spawn a second contact with a new number.
+    const name = t ? (t.origName || t.name) : (opts.name || key);
     const isGroup = !!t?.isGroup;
     const draftImg = _smsDraftImage;
     _smsDraftImage = null;
