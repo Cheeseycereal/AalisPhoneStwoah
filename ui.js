@@ -34,6 +34,7 @@ import {
 } from './social.js';
 import { getSystemsView, deferEvent, declineEvent, selectStoryEvent, acceptAdOffer, declineAdOffer, attachActiveAd, getReputationStatus } from './social-events.js';
 import { maybeScamSms } from './scam.js';
+import { workEnabled, getWork, refreshListings, takeJob, leaveJob, workShift, askPromotion, nextStep, promotionReady, paySalaryIfDue, toggleTask } from './work.js';
 import {
     getChannels, allChannels, findChannel, findChanPost, createMyChannel, deleteMyChannel,
     addFoundChannels, addPersonChannel, toggleSubscribe, deleteChannel, addChannelPosts, publishToMyChannel,
@@ -580,6 +581,11 @@ export function openPhone(threadKey = null) {
     // Стадии заказов двигает время ролевой: пока телефон был закрыт, курьер мог
     // выехать. Догоняем при открытии, иначе заказ висел бы «в сборке».
     notifyDeliveries();
+    // Salary for a new month of roleplay time (Work app, only when enabled)
+    try {
+        const paid = paySalaryIfDue();
+        if (paid) toast(`Salary: ${fmtMoney(paid.amount)} — ${paid.title}`, 'fa-briefcase');
+    } catch (e) { /* ignore */ }
     if (threadKey) {
         // Пришли по тосту в конкретный тред — экран блокировки только мешает
         currentScreen = 'thread';
@@ -691,6 +697,7 @@ export function render() {
     else if (currentScreen === 'shop') renderShop(screen);
     else if (currentScreen === 'shopcat') renderShopCat(screen);
     else if (currentScreen === 'shoporders') renderShopOrders(screen);
+    else if (currentScreen === 'work') renderWork(screen);
     else if (currentScreen === 'ordchat') renderCourierChat(screen);
     else if (currentScreen === 'casino') renderCasino(screen);
     else if (currentScreen === 'news') renderNews(screen);
@@ -1255,6 +1262,11 @@ function renderHome(screen) {
                     <div class="gp-app-icon gp-app-shop">${ic('fa-bag-shopping')}${pendingOrders() > 0 ? `<span class="gp-app-badge">${pendingOrders()}</span>` : ''}</div>
                     <div class="gp-app-name">Магазин</div>
                 </div>
+                ${workEnabled() ? `
+                <div class="gp-app" data-app="work">
+                    <div class="gp-app-icon gp-app-work">${ic('fa-briefcase')}</div>
+                    <div class="gp-app-name">Work</div>
+                </div>` : ''}
                 <div class="gp-app" data-app="chans">
                     <div class="gp-app-icon gp-app-chans">${ic('fa-paper-plane')}${unreadChannels() > 0 ? `<span class="gp-app-badge">${unreadChannels()}</span>` : ''}</div>
                     <div class="gp-app-name">Каналы</div>
@@ -4705,6 +4717,144 @@ function shopItemImage(it, storeId) {
     return `<button class="gp-shop-item-img gp-shop-item-img-empty" data-shopimg="${esc(storeId)}|${esc(it.id)}" title="Нарисовать товар">
         ${busy ? `${ic('fa-spinner fa-spin')}${stopGenBtn(it.id)}` : ic('fa-image')}
     </button>`;
+}
+
+// ═══ WORK ═══
+// Job openings, the current job, shifts and the career ladder.
+// Ported from Delidgi-meow/Phone-ST (GPL-3.0); translated, behind a settings toggle.
+
+let _workBusy = false;
+
+function renderWork(screen) {
+    currentScreen = 'work';
+    const w = getWork();
+    const job = w.job;
+    const step = nextStep(job);
+    const ready = job ? promotionReady(job) : null;
+
+    const jobCard = job ? `
+        <div class="gp-work-job">
+            <div class="gp-work-job-head">
+                <div>
+                    <div class="gp-work-title">${esc(job.title)}</div>
+                    ${job.company ? `<div class="gp-work-company">${esc(job.company)}</div>` : ''}
+                </div>
+                <div class="gp-work-salary">${esc(fmtMoney(job.salary))}<small>per month</small></div>
+            </div>
+            ${job.schedule ? `<div class="gp-work-line">${ic('fa-clock')} ${esc(job.schedule)}</div>` : ''}
+            ${job.duties ? `<div class="gp-work-line gp-work-duties">${esc(job.duties)}</div>` : ''}
+            <div class="gp-work-stats">
+                <span>${ic('fa-briefcase')} shifts: <b>${job.shifts}</b></span>
+                <span>${ic('fa-chart-line')} how they're coping: <b>${job.performance}</b>/100</span>
+            </div>
+            <div class="gp-work-bar"><i style="width:${Math.max(2, Math.min(100, job.performance))}%"></i></div>
+            ${(job.tasks || []).length ? `<div class="gp-work-tasks">
+                <b>Tasks</b>
+                ${job.tasks.map(t => `<label class="gp-work-task${t.done ? ' gp-done' : ''}">
+                    <input type="checkbox" data-worktask="${esc(t.id)}" ${t.done ? 'checked' : ''}>
+                    <span>${esc(t.text)}</span>
+                </label>`).join('')}
+            </div>` : ''}
+            ${job.lastShift ? `<div class="gp-work-shift">
+                <b>Last shift</b>
+                <p>${esc(job.lastShift.summary)}</p>
+                <small>${job.lastShift.delta >= 0 ? '+' : ''}${job.lastShift.delta} performance · ${esc(fmtMoney(job.lastShift.pay))}</small>
+            </div>` : ''}
+            ${job.lastVerdict ? `<div class="gp-work-verdict ${job.lastVerdict.granted ? 'gp-ok' : 'gp-no'}">
+                ${ic(job.lastVerdict.granted ? 'fa-arrow-up' : 'fa-hand')} ${esc(job.lastVerdict.text)}
+            </div>` : ''}
+            ${step ? `<div class="gp-work-ladder">
+                <b>Next step:</b> ${esc(step.title)} — ${esc(fmtMoney(step.salary))}
+                ${ready.ready ? '<span class="gp-work-ready">you can ask</span>'
+                    : `<small>needs ${ready.need.shifts} shifts and ${ready.need.performance}/100</small>`}
+            </div>` : '<div class="gp-work-ladder"><b>Top of the ladder.</b></div>'}
+            <div class="gp-work-actions">
+                <button class="gp-primary" id="gp-work-shift" ${_workBusy ? 'disabled' : ''}>${_workBusy ? ic('fa-spinner fa-spin') : ic('fa-briefcase')} Work a shift</button>
+                ${step ? `<button class="gp-secondary" id="gp-work-promo" ${_workBusy ? 'disabled' : ''}>${ic('fa-arrow-up')} Ask for a promotion</button>` : ''}
+                <button class="gp-secondary gp-danger" id="gp-work-quit">${ic('fa-door-open')} Quit</button>
+            </div>
+        </div>` : '';
+
+    const listings = w.listings.map(l => `
+        <div class="gp-work-card">
+            <div class="gp-work-card-head">
+                <div>
+                    <div class="gp-work-title">${esc(l.title)}</div>
+                    <div class="gp-work-company">${esc(l.company)}${l.field ? ` · ${esc(l.field)}` : ''}</div>
+                </div>
+                <div class="gp-work-salary">${esc(fmtMoney(l.salary))}<small>per month</small></div>
+            </div>
+            ${l.schedule ? `<div class="gp-work-line">${ic('fa-clock')} ${esc(l.schedule)}</div>` : ''}
+            ${l.requirements ? `<div class="gp-work-line">${ic('fa-list-check')} ${esc(l.requirements)}</div>` : ''}
+            ${l.duties ? `<div class="gp-work-line gp-work-duties">${esc(l.duties)}</div>` : ''}
+            ${l.ladder?.length ? `<div class="gp-work-steps">${l.ladder.map(x => `<span>${esc(x.title)} · ${esc(fmtMoney(x.salary))}</span>`).join(ic('fa-arrow-right'))}</div>` : ''}
+            <button class="gp-primary" data-takejob="${esc(l.id)}">${ic('fa-pen-to-square')} Apply</button>
+        </div>`).join('');
+
+    setHtmlKeepScroll(screen, '.gp-work-scroll', `
+        <div class="gp-header gp-thread-header">
+            <button class="gp-iconbtn" id="gp-back">${ic('fa-chevron-left')}</button>
+            <div class="gp-title gp-title-app">${ic('fa-newspaper')} Work</div>
+            <button class="gp-iconbtn" id="gp-work-refresh" title="Fresh openings" ${_workBusy ? 'disabled' : ''}>${_workBusy ? ic('fa-spinner fa-spin') : ic('fa-rotate')}</button>
+        </div>
+        <div class="gp-work-scroll">
+            ${jobCard}
+            <div class="gp-work-section">${job ? 'Other openings' : 'Job openings'}</div>
+            ${listings || `<div class="gp-empty"><div class="gp-empty-icon">${ic('fa-newspaper')}</div><div class="gp-empty-text">Tap ↻ and the model writes job openings<br>to fit your world and background</div></div>`}
+            ${w.history.length ? `<div class="gp-work-section">Previous jobs</div>
+                ${w.history.map(h => `<div class="gp-work-past">${esc(h.title)}${h.company ? ` · ${esc(h.company)}` : ''} <small>${h.shifts} shifts</small></div>`).join('')}` : ''}
+        </div>`);
+
+    screen.querySelector('#gp-back')?.addEventListener('click', () => goto('home'));
+
+    const busyRun = async (fn) => {
+        if (_workBusy) return;
+        _workBusy = true; render();
+        try { await fn(); }
+        catch (e) { toast(String(e?.message || e).slice(0, 70), 'fa-circle-exclamation'); }
+        finally { _workBusy = false; render(); }
+    };
+
+    screen.querySelector('#gp-work-refresh')?.addEventListener('click', () => busyRun(async () => {
+        const n = await refreshListings();
+        toast(`Openings: ${n}`, 'fa-newspaper');
+    }));
+
+    screen.querySelectorAll('[data-takejob]').forEach(b => b.addEventListener('click', () => {
+        const l = getWork().listings.find(x => x.id === b.getAttribute('data-takejob'));
+        if (!l) return;
+        if (job && !confirm(`Leave "${job.title}" and take "${l.title}"?`)) return;
+        takeJob(l.id);
+        updatePhoneInjection();
+        render();
+        toast(`You're hired: ${l.title}`, 'fa-briefcase');
+    }));
+
+    screen.querySelectorAll('[data-worktask]').forEach(b => b.addEventListener('change', () => {
+        toggleTask(b.getAttribute('data-worktask'));
+        updatePhoneInjection();
+        render();
+    }));
+
+    screen.querySelector('#gp-work-shift')?.addEventListener('click', () => busyRun(async () => {
+        const res = await workShift();
+        updatePhoneInjection();
+        toast(`Shift done · ${fmtMoney(res.pay)}`, 'fa-briefcase');
+    }));
+
+    screen.querySelector('#gp-work-promo')?.addEventListener('click', () => busyRun(async () => {
+        const v = await askPromotion();
+        updatePhoneInjection();
+        toast(v.granted ? 'Promoted!' : 'Turned down', v.granted ? 'fa-arrow-up' : 'fa-hand');
+    }));
+
+    screen.querySelector('#gp-work-quit')?.addEventListener('click', () => {
+        if (!confirm('Quit the current job?')) return;
+        leaveJob();
+        updatePhoneInjection();
+        render();
+        toast('You quit', 'fa-door-open');
+    });
 }
 
 function renderShopOrders(screen) {
