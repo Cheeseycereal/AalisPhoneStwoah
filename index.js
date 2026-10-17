@@ -4,6 +4,7 @@ import { updatePhoneInjection } from './prompts.js';
 import { initUI, checkNewIncoming, resetIncomingCounters, updateFabBadge, render, isPhoneOpen, closePhone, applySkin, applyWallpaper, applyChatHiding, toast, notifyBankReminders, notifyDeliveries, deliverScamSms } from './ui.js';
 import { harvestSocialTags, setUserHandle, getUserHandle, listIigProfiles, listIigStyles, listImageBuckets, currentExtModel, stripFakeJournal, resetImageExtCache } from './social.js';
 import { harvestBankTags } from './bank.js';
+import { harvestWorkTags } from './work.js';
 import { harvestPlanTags } from './plans.js';
 import { harvestChannelTags, harvestAnonTags, harvestAnonBust, ANON_NAME } from './channels.js';
 import { maybeScamSms } from './scam.js';
@@ -54,6 +55,7 @@ function setupSettingsPanel() {
                     <label><input type="checkbox" id="gp-set-hide" ${s.hideSmsInChat !== false ? 'checked' : ''}><span>Скрывать смс-переписку из ленты чата</span></label>
                     <label><input type="checkbox" id="gp-set-confirmprofile" ${s.confirmAutoProfile !== false ? 'checked' : ''}><span>Confirm before auto-generating a character's Instagram profile</span></label>
                     <label><input type="checkbox" id="gp-set-ofenabled" ${s.ofEnabled !== false ? 'checked' : ''}><span>Show the OnlyFans app</span></label>
+                    <label><input type="checkbox" id="gp-set-workenabled" ${s.workEnabled ? 'checked' : ''}><span>Work app — jobs, shifts and promotions (a shift costs one generation when you press the button)</span></label>
                     <label><input type="checkbox" id="gp-set-groupambient" ${s.groupAmbient ? 'checked' : ''}><span>Active group chats — members text each other without you (uses tokens)</span></label>
                     <label><input type="checkbox" id="gp-set-scam" ${s.scamEnabled !== false ? 'checked' : ''}><span>Спам и мошенники в смс</span></label>
                     <label><input type="checkbox" id="gp-set-anon" ${s.anonChannel !== false ? 'checked' : ''}><span>Анонимка «Подслушано» в каналах</span></label>
@@ -247,6 +249,12 @@ function setupSettingsPanel() {
     });
     $('#gp-set-ofenabled').on('change', function () {
         getSettings().ofEnabled = this.checked;
+        saveSettingsDebounced();
+        updatePhoneInjection();
+        if (isPhoneOpen()) render();
+    });
+    $('#gp-set-workenabled').on('change', function () {
+        getSettings().workEnabled = this.checked;
         saveSettingsDebounced();
         updatePhoneInjection();
         if (isPhoneOpen()) render();
@@ -511,6 +519,11 @@ jQuery(async () => {
             try {
                 const n = harvestBankTags();
                 if (n > 0) toast(`Банк: ${n} ${n === 1 ? 'операция' : 'операции'} из ролевой`, 'fa-building-columns');
+            } catch (e) { /* ignore */ }
+            // Shifts and tasks played out in the roleplay (Work app)
+            try {
+                const n = harvestWorkTags();
+                if (n > 0) toast(`Work: ${n} counted`, 'fa-briefcase');
             } catch (e) { /* ignore */ }
             // Посты, которые ролевая опубликовала в каналах
             try {
