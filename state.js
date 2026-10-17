@@ -971,12 +971,31 @@ function scanChatUncached() {
     const contacts = new Map();
     const threads = new Map();
 
+    // Renamed contacts. renameContact() only changes the DISPLAY name (meta.names),
+    // but a text addressed to that new name used to be treated as a brand-new
+    // contact (new thread, empty number, the model invents another one). Map the
+    // chosen display name back to the original key so it stays one person.
+    const aliasKeys = new Map();
+    try {
+        for (const [origKey, shown] of Object.entries(getMeta().names || {})) {
+            if (origKey.startsWith('group:')) {
+                const gk = `group:${keyOf(shown)}`;
+                if (gk !== origKey && !aliasKeys.has(gk)) aliasKeys.set(gk, origKey);
+            } else {
+                const nk = keyOf(shown);
+                if (nk && nk !== origKey && !aliasKeys.has(nk)) aliasKeys.set(nk, origKey);
+            }
+        }
+    } catch (e) { /* ignore */ }
+    const kOf = (name) => { const k = keyOf(name); return aliasKeys.get(k) || k; };
+    const gKeyOf = (name) => { const k = `group:${keyOf(name)}`; return aliasKeys.get(k) || k; };
+
     const addContact = (name, number, source) => {
-        const k = keyOf(name);
+        const k = kOf(name);
         if (!k) return;
         const existing = contacts.get(k);
         if (!existing) {
-            contacts.set(k, { name: String(name).trim(), number: String(number || '').trim(), source });
+            contacts.set(k, { name: k !== keyOf(name) ? k : String(name).trim(), number: String(number || '').trim(), source });
         } else if (!existing.number && number) {
             existing.number = String(number).trim();
         }
@@ -984,7 +1003,7 @@ function scanChatUncached() {
 
     // name может быть готовым ключом 'group:xxx' (displayName тогда обязателен)
     const pushMsg = (name, entry, displayName = null) => {
-        const k = String(name).startsWith('group:') ? String(name) : keyOf(name);
+        const k = String(name).startsWith('group:') ? String(name) : kOf(name);
         if (!k || k === 'group:') return;
         if (!threads.has(k)) {
             threads.set(k, {
@@ -1082,7 +1101,7 @@ function scanChatUncached() {
                 if (j.photo) entry.photoDesc = String(j.photo).slice(0, 200);
                 if (j.shot) entry.shot = j.shot;
                 if (groupName) {
-                    if (body || entry.img) pushMsg(`group:${keyOf(groupName)}`, entry, groupName);
+                    if (body || entry.img) pushMsg(gKeyOf(groupName), entry, groupName);
                 } else if (to && (body || entry.img)) {
                     pushMsg(to, entry);
                     // Раз юзер пишет этому имени — контакт точно есть
@@ -1149,7 +1168,7 @@ function scanChatUncached() {
                 if (j.shot) entry.shot = j.shot;
                 if (j.chat) {
                     // Сообщение в групповой чат
-                    pushMsg(`group:${keyOf(j.chat)}`, entry, String(j.chat));
+                    pushMsg(gKeyOf(j.chat), entry, String(j.chat));
                 } else {
                     pushMsg(j.from, entry);
                     addContact(j.from, j.number || '', 'implicit');
@@ -1166,7 +1185,7 @@ function scanChatUncached() {
             while ((sm = SEEN_RE.exec(text)) !== null) {
                 const j = safeJson(sm[1]);
                 if (!j || !j.from) continue;
-                const k = j.chat ? `group:${keyOf(j.chat)}` : keyOf(j.from);
+                const k = j.chat ? gKeyOf(j.chat) : kOf(j.from);
                 if (!k || k === 'group:') continue;
                 if (!threads.has(k)) {
                     threads.set(k, { name: j.chat ? String(j.chat) : String(j.from).trim(), messages: [], isGroup: k.startsWith('group:') });
@@ -1184,7 +1203,7 @@ function scanChatUncached() {
             const proseNum = detectProseNumber(text.replace(/<!--[\s\S]*?-->/g, ''));
             if (proseNum) {
                 const charName = msg.name || null;
-                if (charName && !contacts.has(keyOf(charName))) {
+                if (charName && !contacts.has(kOf(charName))) {
                     addContact(charName, proseNum, 'prose');
                 }
             }
@@ -1253,6 +1272,8 @@ export function getThreadList() {
         list.push({
             key: k,
             name: displayName(k, (g && g.name) || (c && c.name) || (t && t.name) || k),
+            // Original name the model knows this contact by (name above is the renamed display name)
+            origName: (g && g.name) || (c && c.name) || (t && t.name) || k,
             number: (c && c.number) || '',
             isGroup,
             members: g ? g.members : (isGroup ? [...new Set(msgs.filter(m => m.from).map(m => m.from))] : []),
