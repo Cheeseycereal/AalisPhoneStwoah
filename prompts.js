@@ -3,6 +3,7 @@ import { getSettings, getMeta, scanChat, getBlockedSmsKeys, keyOf, EXT_NAME } fr
 import { getSocialActivitySummary } from './social.js';
 import { getBankSummaryLine, bankInjectRule } from './bank.js';
 import { notesInjectBlock } from './notes.js';
+import { workInjectLine } from './work.js';
 import { channelInjectLine, anonInjectLine } from './channels.js';
 import { plansInjectLine, plansInjectRule, getPlans } from './plans.js';
 import { twitchInjectLine } from './twitch.js';
@@ -136,6 +137,10 @@ function buildPrompt() {
             }
         } catch (e) { /* ignore */ }
         try {
+            const workLine = workInjectLine();
+            if (workLine) c += `\n[{{user}}'S JOB]\n${workLine}\n`;
+        } catch (e) { /* ignore */ }
+        try {
             const notesBlock = notesInjectBlock();
             if (notesBlock) c += `\n${notesBlock}\n`;
         } catch (e) { /* ignore */ }
@@ -245,6 +250,11 @@ function buildPrompt() {
         if (getPlans().length) p += `\n${plansInjectRule()}\n`;
         const plans = plansInjectLine();
         if (plans) p += `\n${plans}\n`;
+    } catch (e) { /* ignore */ }
+    // Work: characters who know {{user}} may ask about it
+    try {
+        const workLine = workInjectLine();
+        if (workLine) p += `\n[{{user}}'S JOB — established fact]\n${workLine}\n`;
     } catch (e) { /* ignore */ }
     // Заметки — только расшаренные (секретные не инжектятся никогда)
     try {
