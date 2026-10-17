@@ -27,6 +27,9 @@ const defaultSettings = () => ({
     // Показывать приложение OnlyFans на домашнем экране (false = скрыто совсем,
     // и в инжект модели оно тоже не попадает)
     ofEnabled: true,
+    // Work app (jobs, shifts, promotions; ported from Delidgi-meow/Phone-ST).
+    // Off = app hidden and nothing about work reaches the model.
+    workEnabled: false,
     // Живые групповые чаты: участники сами переписываются между собой, даже когда
     // {{user}} в разговоре не участвует. Выкл по умолчанию — тратит токены.
     groupAmbient: false,
