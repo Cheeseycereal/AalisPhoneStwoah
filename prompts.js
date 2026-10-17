@@ -64,7 +64,9 @@ function buildPrompt() {
     const contactLines = [];
     for (const c of contacts.values()) {
         if (inAppKeys.has(keyOf(c.name))) continue;
-        contactLines.push(`- ${c.name}${c.number ? ` (${c.number})` : ''}`);
+        // If the user renamed this contact on the phone, tell the model (it may be addressed by that name)
+        const shown = meta.names && meta.names[keyOf(c.name)];
+        contactLines.push(`- ${c.name}${c.number ? ` (${c.number})` : ''}${shown && shown !== c.name ? ` — saved on the phone as "${shown}"; same person` : ''}`);
     }
     let contactsBlock = contactLines.length > 0
         ? `Contacts already in {{user}}'s phone (these characters HAVE {{user}}'s number, and {{user}} has theirs):\n${contactLines.join('\n')}`
