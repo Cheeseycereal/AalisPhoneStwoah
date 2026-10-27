@@ -392,6 +392,9 @@ function createPhone() {
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && isPhoneOpen()) closePhone();
     });
+    // Window resized / snapped / zoomed while the phone is open: re-check, so a stale
+    // fullscreen state can fix itself without a page refresh
+    window.addEventListener('resize', () => { if (isPhoneOpen()) checkPhoneCollapsed('resize'); });
 }
 
 // ═══ Скины и кастомный CSS ═══
@@ -598,26 +601,31 @@ export function openPhone(threadKey = null) {
     if (clockTimer) clearInterval(clockTimer);
     clockTimer = setInterval(tickClock, 20000);
 
-    // Страховка от «белой полосы»: если корпус телефона схлопнулся
-    // (старый Safari без inset/dvh, контейнер-квирки ST 1.18) —
-    // принудительно растягиваем инлайн-стилями на весь экран.
-    setTimeout(() => {
-        try {
-            const ph = document.getElementById('gp-phone');
-            if (!ph) return;
-            const r = ph.getBoundingClientRect();
-            if (r.height < 200 || r.width < 200) {
-                console.warn(`[GlassPhone] Phone collapsed (${Math.round(r.width)}x${Math.round(r.height)}) — forcing fullscreen fallback`);
-                Object.assign(ov.style, {
-                    position: 'fixed', top: '0', left: '0',
-                    width: '100vw', height: '100vh', display: 'flex',
-                });
-                Object.assign(ph.style, {
-                    width: '100vw', height: '100vh', maxHeight: 'none', borderRadius: '0',
-                });
-            }
-        } catch (e) { /* ignore */ }
-    }, 80);
+    // Safety net for a collapsed phone body (old Safari without inset/dvh, ST container quirks).
+    // It used to write permanent inline styles that survived closing the phone, so the
+    // phone stayed stuck fullscreen until the whole page was refreshed. Now it is a class
+    // that is re-measured every open, on every window resize, and dropped on close.
+    ov.classList.remove('gp-force-full');
+    setTimeout(() => checkPhoneCollapsed('open'), 80);
+}
+
+function checkPhoneCollapsed(reason) {
+    try {
+        if (!isPhoneOpen()) return;
+        const ov = document.getElementById('gp-overlay');
+        const ph = document.getElementById('gp-phone');
+        if (!ov || !ph) return;
+        ov.classList.remove('gp-force-full'); // measure the natural layout, not our own fallback
+        const r = ph.getBoundingClientRect();
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const collapsed = r.height < 200 || r.width < 200;
+        // A genuinely tiny browser window makes a small phone honestly; forcing fullscreen
+        // there helps nobody, so only step in when the window itself is big enough.
+        if (collapsed && vw >= 320 && vh >= 320) {
+            console.warn(`[GlassPhone] Phone collapsed (${Math.round(r.width)}x${Math.round(r.height)} in a ${vw}x${vh} window, ${reason}) — fullscreen fallback on`);
+            ov.classList.add('gp-force-full');
+        }
+    } catch (e) { /* ignore */ }
 }
 
 export function closePhone() {
@@ -626,7 +634,7 @@ export function closePhone() {
     // Недописанный текст переживает закрытие телефона
     try { captureDrafts(document.getElementById('gp-screen')); } catch (e) { /* ignore */ }
     const ov = document.getElementById('gp-overlay');
-    if (ov) ov.classList.remove('gp-open');
+    if (ov) { ov.classList.remove('gp-open'); ov.classList.remove('gp-force-full'); }
     if (clockTimer) { clearInterval(clockTimer); clockTimer = null; }
 }
 
