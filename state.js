@@ -1058,6 +1058,25 @@ function scanChatUncached() {
         if (offsets[i] === null) offsets[i] = firstKnown;
     }
 
+    // Group chats that really include {{user}}: ones they created by hand, and ones they
+    // have texted into. A group tag for any other group is the model describing a chat
+    // between OTHER characters (two cousins, a friend group) — it must not land on
+    // {{user}}'s phone, and {{user}} must not be written into it.
+    const userGroupKeys = new Set();
+    try {
+        for (const g of (getMeta().groups || [])) if (g && g.name) userGroupKeys.add(gKeyOf(g.name));
+        for (const m of chat) {
+            if (!m || !m.is_user || !m.mes) continue;
+            const t = stripThink(m.mes);
+            const o = t.match(OUT_RE);
+            if (!o) continue;
+            const oj = safeJson(o[1]) || {};
+            const vg = t.replace(OUT_RE, '').trim().match(OUT_VISIBLE_GROUP_RE);
+            const gn = oj.group || (typeof oj.to === 'string' && oj.to.match(/^группа:\s*(.+)$/i)?.[1]) || (vg ? vg[2].trim() : null);
+            if (gn) userGroupKeys.add(gKeyOf(gn));
+        }
+    } catch (e) { /* ignore */ }
+
     for (let i = 0; i < chat.length; i++) {
         const msg = chat[i];
         if (!msg || !msg.mes) continue;
@@ -1141,6 +1160,17 @@ function scanChatUncached() {
                 // описала её реплику в чужой переписке.
                 if (!msg.is_user && isUserName(j.from)) {
                     continue;
+                }
+                // Исключение четвёртое: групповой чат, в котором {{user}} не состоит.
+                // Состоит — если группа заведена руками, юзер в неё писал, ИЛИ модель
+                // явно пометила тег "user":true (новую группу с юзером). Иначе это
+                // переписка между другими персонажами.
+                if (j.chat && !msg.is_user) {
+                    const gk = gKeyOf(j.chat);
+                    if (!userGroupKeys.has(gk)) {
+                        if (j.user === true || (j.to && isUserName(j.to))) userGroupKeys.add(gk);
+                        else continue;
+                    }
                 }
                 // Заблокированный контакт не создаёт пузырь/непрочитанное. Проверка
                 // идёт по историческому интервалу, поэтому блок переживает reload,
