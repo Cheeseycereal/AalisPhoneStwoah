@@ -11,13 +11,14 @@
     border-radius:10px;
     overflow:hidden;
 }
-#gp-settings-drawer .gp-settings-header{display:grid;grid-template-columns:minmax(0,1fr) 18px;align-items:center;gap:10px;min-height:56px;padding:8px 12px;background:color-mix(in srgb,var(--gp-settings-fg) 5%,var(--gp-settings-bg));border-bottom:1px solid var(--gp-settings-border)}
+#gp-settings-drawer .gp-settings-header{display:grid;grid-template-columns:minmax(0,1fr) auto 18px;align-items:center;gap:10px;min-height:56px;padding:8px 12px;background:color-mix(in srgb,var(--gp-settings-fg) 5%,var(--gp-settings-bg));border-bottom:1px solid var(--gp-settings-border)}
 #gp-settings-drawer .gp-settings-title{display:flex;align-items:center;gap:9px;min-width:0;text-align:left}
 #gp-settings-drawer .gp-settings-title>span:last-child{display:flex;min-width:0;flex-direction:column}
 #gp-settings-drawer .gp-settings-title b{font-size:15px;line-height:1.2;letter-spacing:-.01em}
 #gp-settings-drawer .gp-settings-title small{margin-top:2px;color:var(--gp-settings-muted);font-size:9px;line-height:1.2;font-weight:400}
 #gp-settings-drawer .gp-settings-status-dot{width:7px;height:7px;flex:0 0 auto;border-radius:50%;background:#68c89a}
 #gp-settings-drawer.gp-settings-disabled .gp-settings-status-dot{background:var(--gp-settings-muted)}
+#gp-settings-drawer .gp-settings-language{width:104px;height:32px;margin:0;padding:4px 24px 4px 8px;font-size:11px}
 #gp-settings-drawer .gp-settings-body{padding:10px 12px 12px;background:color-mix(in srgb,var(--gp-settings-bg) 96%,transparent)}
 #gp-settings-drawer .gp-settings-quick{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:8px}
 #gp-settings-drawer .gp-settings-quick label{display:flex;min-height:36px;align-items:center;gap:7px;padding:7px 8px;border:1px solid var(--gp-settings-border);border-radius:7px;cursor:pointer}
@@ -41,7 +42,6 @@
 #gp-settings-drawer .gp-settings-field textarea.text_pole{height:58px;min-height:58px;resize:vertical}
 #gp-settings-drawer .gp-settings-field>small{font-size:8px;line-height:1.2}
 #gp-settings-drawer .gp-settings-number{max-width:94px}
-#gp-settings-drawer .gp-settings-note{font-size:9.5px;line-height:1.35;color:var(--gp-settings-muted);opacity:.8;padding:0 0 2px}
 #gp-settings-drawer .gp-settings-control-row{display:flex;gap:5px;align-items:stretch}
 #gp-settings-drawer .gp-settings-icon-button{width:34px;min-width:34px;height:34px;margin:0;padding:0;display:grid;place-items:center}
 #gp-settings-drawer .gp-settings-checks{display:flex;flex-direction:column}
@@ -52,7 +52,7 @@
 #gp-settings-drawer .gp-settings-footer{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-top:9px;border-top:1px solid var(--gp-settings-border);color:var(--gp-settings-muted)}
 #gp-settings-drawer .gp-settings-footer small{font-size:8px;line-height:1.35}
 #gp-settings-drawer #gp-version-label{flex:0 0 auto;font-weight:700}
-@media(max-width:620px){#gp-settings-drawer .gp-settings-header{grid-template-columns:minmax(0,1fr) 18px}#gp-settings-drawer .gp-settings-quick,#gp-settings-drawer .gp-settings-grid{grid-template-columns:1fr}#gp-settings-drawer .gp-settings-wide{grid-column:auto}#gp-settings-drawer .gp-settings-group-body{padding-left:0}}
+@media(max-width:620px){#gp-settings-drawer .gp-settings-header{grid-template-columns:minmax(0,1fr) auto 18px}#gp-settings-drawer .gp-settings-language{width:92px}#gp-settings-drawer .gp-settings-quick,#gp-settings-drawer .gp-settings-grid{grid-template-columns:1fr}#gp-settings-drawer .gp-settings-wide{grid-column:auto}#gp-settings-drawer .gp-settings-group-body{padding-left:0}}
 @media(prefers-reduced-motion:reduce){#gp-settings-drawer .gp-settings-chevron{transition:none}}
 .gp-story-loading{position:absolute;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:30px;text-align:center;background:rgba(7,9,18,.78);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}.gp-story-loading>div{font-size:38px;color:var(--gp-accent-a)}.gp-story-loading b{font-size:18px}.gp-story-loading span{max-width:260px;font-size:12px;opacity:.72}
 .gp-event-history button{width:100%;display:flex;align-items:center;gap:10px;border:0;background:transparent;color:inherit;text-align:left;padding:9px 4px}.gp-event-history button>span{display:flex;flex:1;min-width:0;flex-direction:column}.gp-event-history button small{opacity:.6}.gp-event-history button:disabled{opacity:.55}
@@ -212,14 +212,6 @@
     -webkit-backdrop-filter: blur(7px);
 }
 #gp-overlay.gp-open { display: flex; animation: gp-fade .25s ease; }
-/* Fallback when the phone body measures collapsed (toggled by ui.js, never permanent) */
-#gp-overlay.gp-force-full #gp-phone {
-    width: 100vw !important;
-    height: 100vh !important;
-    height: 100dvh !important;
-    max-height: none !important;
-    border-radius: 0 !important;
-}
 @keyframes gp-fade { from { opacity: 0; } to { opacity: 1; } }
 
 #gp-phone {
@@ -1095,9 +1087,7 @@
 .gp-social-hub,.gp-story-screen { padding:12px; gap:12px; }
 .gp-profile-grid { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
 .gp-profile-card { min-width:0; padding:13px 11px; border:1px solid rgba(255,255,255,.12); border-radius:var(--gp-theme-card-radius); background:var(--gp-glass-strong); box-shadow:0 8px 22px rgba(0,0,0,.12); }
-.gp-profile-card div { display:flex; align-items:center; justify-content:space-between; gap:6px; font-size:11px; font-weight:700; }.gp-profile-card b { display:block; margin:5px 0 1px; font-size:22px; }.gp-profile-card span { display:block; color:var(--gp-text-dim); font-size:9px; line-height:1.3; }
-.gp-followers-edit { width:20px; height:20px; min-width:20px; font-size:9px; opacity:.6; }
-.gp-followers-edit:hover { opacity:1; }
+.gp-profile-card div { font-size:11px; font-weight:700; }.gp-profile-card b { display:block; margin:5px 0 1px; font-size:22px; }.gp-profile-card span { display:block; color:var(--gp-text-dim); font-size:9px; line-height:1.3; }
 .gp-social-section { padding:12px; border:1px solid rgba(255,255,255,.11); border-radius:var(--gp-theme-card-radius); background:var(--gp-glass); }
 .gp-social-section h3 { margin:0 0 10px; font-size:12px; }
 .gp-task-card { position:relative; display:grid; grid-template-columns:1fr auto; gap:3px 8px; margin-top:9px; padding:9px; border-radius:12px; background:rgba(255,255,255,.06); }
@@ -1392,101 +1382,6 @@
 .gp-ig-pick:hover { background: var(--gp-glass-strong); }
 .gp-ig-pick-has { border-style: solid; padding: 0; }
 .gp-ig-pick-has img { width: 100%; height: 100%; object-fit: cover; }
-
-/* ═══ Instagram profile (grid view) ═══ */
-.gp-ig-profile-head {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 16px 14px;
-}
-.gp-ig-profile-avatar { width: 76px; height: 76px; font-size: 26px; flex: none; }
-.gp-ig-profile-info { flex: 1; min-width: 0; }
-.gp-ig-profile-name { font-weight: 700; font-size: 15px; line-height: 1.25; }
-.gp-ig-profile-handle { font-size: 11.5px; opacity: 0.55; margin-bottom: 8px; }
-.gp-ig-profile-bio { font-size: 11.5px; line-height: 1.4; margin-bottom: 8px; opacity: 0.85; }
-.gp-ig-profile-genbio {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 10.5px;
-    font-weight: 600;
-    color: var(--gp-text-dim);
-    background: var(--gp-glass);
-    border: 1px solid var(--gp-border-soft);
-    border-radius: 12px;
-    padding: 5px 10px;
-    margin-bottom: 8px;
-    cursor: pointer;
-    font-family: inherit;
-}
-.gp-ig-profile-genbio:hover { background: var(--gp-glass-strong); }
-.gp-ig-profile-genbio:disabled { opacity: 0.6; cursor: default; }
-.gp-ig-profile-stats { display: flex; gap: 18px; }
-.gp-ig-profile-stat { display: flex; flex-direction: column; font-size: 11.5px; }
-.gp-ig-profile-stat b { font-size: 14px; }
-.gp-ig-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 2px;
-    padding: 2px;
-}
-.gp-ig-grid-item {
-    aspect-ratio: 1 / 1;
-    overflow: hidden;
-    background: rgba(0,0,0,0.25);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    position: relative;
-}
-.gp-ig-grid-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.gp-ig-grid-item-gen { color: rgba(255,255,255,0.85); font-size: 18px; }
-.gp-ig-grid-empty { grid-column: 1 / -1; }
-.gp-verified { color: #3aa0ff; font-size: 0.85em; vertical-align: baseline; }
-.gp-ig-own-extras { padding: 0 12px 8px; display: flex; flex-direction: column; gap: 10px; }
-.gp-ig-chiprow { display: flex; flex-wrap: wrap; gap: 6px; }
-.gp-ig-chip {
-    display: inline-flex; align-items: center; gap: 6px;
-    font-size: 10.5px; font-weight: 600; font-family: inherit;
-    color: var(--gp-text-dim); background: var(--gp-glass);
-    border: 1px solid var(--gp-border-soft); border-radius: 12px;
-    padding: 5px 10px; cursor: pointer;
-}
-.gp-ig-chip:hover { background: var(--gp-glass-strong); }
-.gp-ig-chip i.fa-pen { font-size: 8px; opacity: .5; }
-.gp-ig-chip-static { cursor: default; }
-.gp-ig-chip-static:hover { background: var(--gp-glass); }
-.gp-ig-highlights { display: flex; gap: 12px; overflow-x: auto; padding: 2px 0 4px; }
-.gp-ig-hl { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: none; width: 58px; background: none; border: 0; cursor: pointer; font-family: inherit; color: inherit; }
-.gp-ig-hl-ring { width: 54px; height: 54px; border-radius: 50%; padding: 2px; border: 1.5px solid var(--gp-border-soft); overflow: hidden; display: block; }
-.gp-ig-hl-ring img, .gp-ig-hl-fill { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.85); font-size: 14px; }
-.gp-ig-hl i { font-style: normal; font-size: 9.5px; max-width: 58px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: .8; }
-.gp-anon-q { margin: 8px 12px; padding: 12px; border-radius: 16px; background: var(--gp-glass); border: 1px solid var(--gp-border-soft); }
-.gp-anon-q-head { display: flex; justify-content: space-between; font-size: 10.5px; opacity: .65; margin-bottom: 6px; }
-.gp-anon-q-text { font-size: 13px; line-height: 1.4; margin-bottom: 10px; }
-.gp-anon-q-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-.gp-igst-reply {
-    flex: 1; min-width: 0; height: 34px; padding: 0 12px; border-radius: 17px;
-    border: 1px solid rgba(255,255,255,.35); background: rgba(0,0,0,.35);
-    color: #fff; font-size: 12px; font-family: inherit; outline: none;
-}
-.gp-igst-reply::placeholder { color: rgba(255,255,255,.6); }
-.gp-igst-bottom-other { display: flex; align-items: center; gap: 8px; }
-.gp-igst-shot { color: #ffd166; }
-.gp-igst-send { font-size: 19px !important; width: 36px !important; height: 36px !important; flex: none; }
-.gp-ig-following-tag {
-    font-size: 9.5px;
-    font-weight: 700;
-    color: var(--gp-text-dim);
-    background: var(--gp-glass-strong);
-    border: 1px solid var(--gp-border-soft);
-    border-radius: 10px;
-    padding: 3px 8px;
-    margin-left: auto;
-    flex: none;
-}
 
 /* ═══ Тост ═══
    Общий каркас: голова (иконка или аватар), тело в две строки, время и
@@ -4451,42 +4346,230 @@ img[data-zoom] { cursor: zoom-in; }
 .gp-cal-day i.gp-done { background: var(--gp-text-dim); }
 .gp-cal-empty { font-size: 11px; color: var(--gp-text-dim); padding: 2px 6px 4px; }
 
-/* ═══ Work (ported from Delidgi-meow/Phone-ST) ═══ */
-.gp-app-work { background: linear-gradient(140deg, rgba(120,140,190,.55), rgba(70,90,140,.45)); }
-.gp-work-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 6px 2px 12px; display: flex; flex-direction: column; gap: 10px; }
-.gp-work-section { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; opacity: .55; margin-top: 4px; }
-.gp-work-job, .gp-work-card {
-    padding: 12px; border-radius: var(--gp-theme-card-radius, 14px);
-    background: var(--gp-glass); border: 1px solid var(--gp-border-soft);
-    display: flex; flex-direction: column; gap: 7px;
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* ═══ Y2K phone shells ═══ */
+/* Three new skins paired with the Era setting: Flip Phone (2000–2004), Sidekick */
+/* (2005–2008), BlackBerry (2009–2011). Each reshapes the frame, screen, icons  */
+/* and typography. The phone's HTML layout stays the same so every app still    */
+/* works; what changes is colors, bezels, radii, and the "feel" of the glass.   */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Theme preview chips in Appearance (small color dots at a glance) ─── */
+.gp-preview-flip { background: linear-gradient(140deg, #c8d680 0%, #8aa83a 60%, #1a1b14 100%); }
+.gp-preview-sidekick { background: linear-gradient(140deg, #ff6b1c 0%, #ffb169 60%, #2b1d14 100%); }
+.gp-preview-bbry { background: linear-gradient(140deg, #c8102e 0%, #ff4d6a 60%, #1c1e26 100%); }
+
+/* ─── Flip Phone (Y2K early) ─── */
+/* Candy-bar / Nokia-era vibe: chunky dark bezel, pixel-ish mono-green screen,  */
+/* 3-across icon grid like a small LCD.                                          */
+body.gp-theme-flip {
+    --gp-accent-a: #c8d680;
+    --gp-accent-b: #8aa83a;
+    --gp-accent-a-rgb: 200, 214, 128;
+    --gp-accent-b-rgb: 138, 168, 58;
+    --gp-text: #c8d680;
+    --gp-text-dim: #8ba35a;
+    --gp-border: rgba(200, 214, 128, 0.20);
+    --gp-border-soft: rgba(200, 214, 128, 0.12);
+    --gp-glass: rgba(42, 50, 20, 0.55);
+    --gp-radius: 18px;
 }
-.gp-work-job { border-color: rgba(var(--gp-accent-a-rgb), .45); background: linear-gradient(135deg, rgba(var(--gp-accent-a-rgb), .1), var(--gp-glass)); }
-.gp-work-job-head, .gp-work-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.gp-work-title { font-size: 14px; font-weight: 700; }
-.gp-work-company { font-size: 11px; opacity: .6; margin-top: 1px; }
-.gp-work-salary { font-size: 13.5px; font-weight: 700; white-space: nowrap; text-align: right; }
-.gp-work-salary small { display: block; font-size: 9px; font-weight: 400; opacity: .5; }
-.gp-work-line { font-size: 11.5px; opacity: .8; display: flex; gap: 6px; }
-.gp-work-duties { opacity: .6; }
-.gp-work-stats { display: flex; gap: 14px; font-size: 11px; opacity: .8; flex-wrap: wrap; }
-.gp-work-bar { height: 4px; border-radius: 99px; background: rgba(255,255,255,.1); overflow: hidden; }
-.gp-work-bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--gp-accent-a), var(--gp-accent-b)); }
-.gp-work-shift { padding: 9px 10px; border-radius: 10px; background: rgba(255,255,255,.05); font-size: 11.5px; }
-.gp-work-shift p { margin: 4px 0 3px; opacity: .85; line-height: 1.4; }
-.gp-work-shift small { opacity: .5; font-size: 10px; }
-.gp-work-verdict { padding: 8px 10px; border-radius: 10px; font-size: 11.5px; line-height: 1.4; }
-.gp-work-verdict.gp-ok { background: rgba(79,191,122,.13); color: #9fe1bb; }
-.gp-work-verdict.gp-no { background: rgba(226,75,74,.12); color: #ffb0af; }
-.gp-work-ladder { font-size: 11.5px; opacity: .85; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
-.gp-work-ladder small { opacity: .6; font-size: 10.5px; }
-.gp-work-ready { font-size: 10px; padding: 2px 7px; border-radius: 99px; background: rgba(79,191,122,.2); color: #9fe1bb; }
-.gp-work-steps { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; font-size: 10.5px; opacity: .65; }
-.gp-work-steps span { padding: 2px 7px; border-radius: 99px; background: rgba(255,255,255,.06); }
-.gp-work-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
-.gp-work-actions button { flex: 1 1 auto; }
-.gp-work-past { font-size: 11.5px; opacity: .6; padding: 6px 8px; border-bottom: 1px solid var(--gp-border-soft); }
-.gp-work-past small { opacity: .7; margin-left: 6px; }
-.gp-work-tasks { padding: 9px 10px; border-radius: 10px; background: rgba(255,255,255,.05); font-size: 11.5px; display: flex; flex-direction: column; gap: 5px; }
-.gp-work-task { display: flex; align-items: flex-start; gap: 7px; cursor: pointer; line-height: 1.35; }
-.gp-work-task input { margin-top: 2px; flex: 0 0 auto; }
-.gp-work-task.gp-done span { opacity: .45; text-decoration: line-through; }
+.gp-skin-flip {
+    background:
+        radial-gradient(60% 40% at 50% 8%, rgba(255,255,255,0.04), transparent 60%),
+        linear-gradient(170deg, #26261e 0%, #121008 100%) !important;
+    border: 5px solid #0d0b06 !important;
+    box-shadow:
+        0 0 0 2px #3a3528,
+        inset 0 2px 0 rgba(255,255,255,0.06),
+        inset 0 -2px 6px rgba(0,0,0,0.5),
+        0 40px 90px rgba(0, 0, 0, 0.7) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+.gp-skin-flip #gp-screen {
+    background: linear-gradient(180deg, #1b1d10 0%, #141510 100%) !important;
+    color: #c8d680 !important;
+    font-family: "VT323", "Courier New", "Lucida Console", monospace !important;
+    letter-spacing: 0.3px;
+    box-shadow: inset 0 0 0 2px #0a0b06, inset 0 0 30px rgba(0,0,0,0.4);
+}
+.gp-skin-flip .gp-statusbar,
+.gp-skin-flip .gp-home-clock,
+.gp-skin-flip .gp-home-date {
+    color: #c8d680 !important;
+    text-shadow: 0 0 2px rgba(200, 214, 128, 0.3);
+}
+.gp-skin-flip .gp-home-clock { font-family: "VT323", monospace !important; font-size: 44px !important; }
+.gp-skin-flip .gp-home-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 10px !important;
+    padding: 6px 4px !important;
+}
+.gp-skin-flip .gp-app-icon {
+    width: 48px !important; height: 48px !important;
+    border-radius: 4px !important;
+    background: linear-gradient(145deg, #333820, #1a1c0e) !important;
+    color: #c8d680 !important;
+    border: 1px solid #5a632e !important;
+    box-shadow: inset 0 0 0 1px #0a0b06, 0 1px 0 rgba(0,0,0,0.6) !important;
+    font-size: 20px !important;
+}
+.gp-skin-flip .gp-app-name {
+    color: #a8b870 !important;
+    font-size: 9px !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-family: "VT323", monospace !important;
+}
+.gp-skin-flip .gp-app-badge {
+    background: #c8d680 !important;
+    color: #141510 !important;
+    font-family: "VT323", monospace !important;
+}
+.gp-skin-flip .gp-wallpaper { opacity: 0.08 !important; filter: grayscale(1) contrast(1.2) !important; }
+.gp-skin-flip .gp-homebar { background: #c8d680 !important; opacity: 0.4 !important; }
+
+/* ─── Sidekick (Y2K mid) ─── */
+/* T-Mobile Sidekick inspiration: warm plastic brown-black body with a vivid    */
+/* orange border and dot-matrix-ish screen; 4-across icon grid, chunky icons.   */
+body.gp-theme-sidekick {
+    --gp-accent-a: #ff6b1c;
+    --gp-accent-b: #ffb169;
+    --gp-accent-a-rgb: 255, 107, 28;
+    --gp-accent-b-rgb: 255, 177, 105;
+    --gp-text: #ffd4a8;
+    --gp-text-dim: #d49870;
+    --gp-border: rgba(255, 107, 28, 0.35);
+    --gp-border-soft: rgba(255, 107, 28, 0.18);
+    --gp-glass: rgba(45, 25, 15, 0.65);
+    --gp-radius: 14px;
+}
+.gp-skin-sidekick {
+    background:
+        radial-gradient(50% 30% at 50% 5%, rgba(255, 169, 97, 0.08), transparent 70%),
+        linear-gradient(165deg, #3a241a 0%, #1c0f08 100%) !important;
+    border: 7px solid #110802 !important;
+    box-shadow:
+        0 0 0 2px #ff6b1c,
+        inset 0 2px 0 rgba(255, 255, 255, 0.05),
+        inset 0 -2px 10px rgba(0,0,0,0.6),
+        0 40px 90px rgba(0, 0, 0, 0.75) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+.gp-skin-sidekick #gp-screen {
+    background:
+        repeating-linear-gradient(0deg, rgba(255,107,28,0.02) 0 1px, transparent 1px 3px),
+        linear-gradient(180deg, #1f242e 0%, #141921 100%) !important;
+    color: #ffd4a8 !important;
+    box-shadow: inset 0 0 0 2px #0a0d14, inset 0 0 40px rgba(0,0,0,0.5);
+}
+.gp-skin-sidekick .gp-statusbar,
+.gp-skin-sidekick .gp-home-clock,
+.gp-skin-sidekick .gp-home-date { color: #ffd4a8 !important; }
+.gp-skin-sidekick .gp-home-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 8px !important;
+}
+.gp-skin-sidekick .gp-app-icon {
+    border-radius: 6px !important;
+    background: linear-gradient(145deg, #ff8a3d, #c04d10) !important;
+    color: #fff !important;
+    border: 1px solid #ff8a3d !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.35),
+        inset 0 -2px 4px rgba(0,0,0,0.3),
+        0 2px 3px rgba(0,0,0,0.5) !important;
+}
+.gp-skin-sidekick .gp-app-name {
+    color: #ffd4a8 !important;
+    font-size: 10px !important;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    font-weight: 600;
+}
+.gp-skin-sidekick .gp-app-badge {
+    background: #ff6b1c !important;
+    color: #fff !important;
+    border: 1px solid #141921 !important;
+}
+.gp-skin-sidekick .gp-wallpaper { opacity: 0.12 !important; }
+.gp-skin-sidekick .gp-homebar { background: #ff6b1c !important; opacity: 0.5 !important; }
+
+/* ─── BlackBerry (Y2K late) ─── */
+/* Dark corporate chrome with Tangerine/BBM red accents, tight 4-across icon     */
+/* grid, slimmer bezel, sharper type.                                            */
+body.gp-theme-bbry {
+    --gp-accent-a: #c8102e;
+    --gp-accent-b: #ff4d6a;
+    --gp-accent-a-rgb: 200, 16, 46;
+    --gp-accent-b-rgb: 255, 77, 106;
+    --gp-text: #e8e8ec;
+    --gp-text-dim: #a0a4ad;
+    --gp-border: rgba(232, 232, 236, 0.14);
+    --gp-border-soft: rgba(232, 232, 236, 0.08);
+    --gp-glass: rgba(28, 30, 38, 0.75);
+    --gp-radius: 10px;
+}
+.gp-skin-bbry {
+    background:
+        linear-gradient(180deg, #16181e 0%, #0a0b0f 100%) !important;
+    border: 3px solid #2a2d35 !important;
+    box-shadow:
+        0 0 0 1px #4a4d58,
+        inset 0 2px 0 rgba(255, 255, 255, 0.08),
+        inset 0 -1px 0 rgba(0,0,0,0.4),
+        0 40px 90px rgba(0, 0, 0, 0.8) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+.gp-skin-bbry #gp-screen {
+    background: linear-gradient(180deg, #1c1e26 0%, #141620 100%) !important;
+    color: #e8e8ec !important;
+    box-shadow: inset 0 0 0 1px #0a0b10, inset 0 0 20px rgba(0,0,0,0.4);
+}
+.gp-skin-bbry .gp-statusbar {
+    background: linear-gradient(180deg, #2a2d38, #1c1e26) !important;
+    color: #e8e8ec !important;
+    border-bottom: 1px solid #4a4d58;
+}
+.gp-skin-bbry .gp-home-clock,
+.gp-skin-bbry .gp-home-date { color: #e8e8ec !important; }
+.gp-skin-bbry .gp-home-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 7px !important;
+}
+.gp-skin-bbry .gp-app-icon {
+    border-radius: 8px !important;
+    background: linear-gradient(145deg, #3a3d48, #22252c) !important;
+    color: #e8e8ec !important;
+    border: 1px solid #4a4d58 !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.1),
+        0 2px 4px rgba(0,0,0,0.5) !important;
+}
+.gp-skin-bbry .gp-app-name {
+    color: #c8c8cc !important;
+    font-size: 10px !important;
+    letter-spacing: 0.2px;
+    font-weight: 500;
+}
+.gp-skin-bbry .gp-app-badge {
+    background: #c8102e !important;
+    color: #fff !important;
+    border: 1px solid #1c1e26 !important;
+}
+.gp-skin-bbry .gp-wallpaper { opacity: 0.22 !important; }
+.gp-skin-bbry .gp-homebar { background: #c8102e !important; opacity: 0.6 !important; }
+
+/* ─── Era-wide tweaks that apply across every skin ─── */
+/* Y2K phones didn't have glassy blurred overlays. Keep the dim backdrop but    */
+/* lose the blur so the shell feels more physical.                              */
+body.gp-era-y2k-early #gp-overlay,
+body.gp-era-y2k-mid #gp-overlay,
+body.gp-era-y2k-late #gp-overlay {
+    backdrop-filter: blur(1px) !important;
+    -webkit-backdrop-filter: blur(1px) !important;
+    background: rgba(0, 0, 0, 0.55) !important;
+}
