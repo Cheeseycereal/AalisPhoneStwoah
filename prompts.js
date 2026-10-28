@@ -1,9 +1,9 @@
 import { setExtensionPrompt, extension_prompt_types, extension_prompt_roles } from '../../../../script.js';
 import { getSettings, getMeta, scanChat, getBlockedSmsKeys, keyOf, EXT_NAME } from './state.js';
+import { eraTextspeakHint, getEra } from './era.js';
 import { getSocialActivitySummary } from './social.js';
 import { getBankSummaryLine, bankInjectRule } from './bank.js';
 import { notesInjectBlock } from './notes.js';
-import { workInjectLine } from './work.js';
 import { channelInjectLine, anonInjectLine } from './channels.js';
 import { plansInjectLine, plansInjectRule, getPlans } from './plans.js';
 import { twitchInjectLine } from './twitch.js';
@@ -64,9 +64,7 @@ function buildPrompt() {
     const contactLines = [];
     for (const c of contacts.values()) {
         if (inAppKeys.has(keyOf(c.name))) continue;
-        // If the user renamed this contact on the phone, tell the model (it may be addressed by that name)
-        const shown = meta.names && meta.names[keyOf(c.name)];
-        contactLines.push(`- ${c.name}${c.number ? ` (${c.number})` : ''}${shown && shown !== c.name ? ` — saved on the phone as "${shown}"; same person` : ''}`);
+        contactLines.push(`- ${c.name}${c.number ? ` (${c.number})` : ''}`);
     }
     let contactsBlock = contactLines.length > 0
         ? `Contacts already in {{user}}'s phone (these characters HAVE {{user}}'s number, and {{user}} has theirs):\n${contactLines.join('\n')}`
@@ -110,12 +108,9 @@ function buildPrompt() {
             c += `0. End EVERY reply with the in-world clock as the last line: <!--tel:time:HH:MM DD.MM.YYYY--> (advance it by how much time this reply took).\n`;
         }
         c += `1. Character gives {{user}} their number → <!--tel:contact:{"name":"X","number":"phone in the local format"}-->\n`;
-        c += `2. Character texts {{user}}'s phone → one tag per message: <!--tel:sms:{"from":"X","text":"..."}--> (MMS: +"photo":"desc"; group chat that INCLUDES {{user}}: +"chat":"Name" (a NEW group with {{user}} in it: also +"user":true on its first tag; chats between OTHER characters that don't include {{user}} are prose only, never a tag); voice message: +"voice":true, "text" = transcript of what they say; screenshot of an EXISTING post: +"shot":{"app":"tw|ig|ch","author":"post author","text":"the post's own text"}). Only if they plausibly have {{user}}'s number and are NOT listed as BLOCKED. ONLY {{user}}'s phone: what OTHER characters receive on their phones — prose only, NEVER a tag.\n`;
-        c += `3. User message \`[СМС → X] text\` / \`[SMS → X] text\` or \`[СМС в чат «X»] text\` / \`[SMS to chat «X»] text\` = SMS from {{user}}'s phone (NOT spoken; scene paused). \`[Голосовое → X]\` / \`[Voice → X]\` = {{user}}'s VOICE message, text = transcript (the character hears {{user}}'s voice). Reply ONLY with tel:sms tags — zero visible prose. Instead: <!--tel:silent--> if they'd never even open the phone, or <!--tel:seen:{"from":"X"}--> if they'd open it, see it, and deliberately not reply (left on read). Resume prose on {{user}}'s next normal message, weaving the texting into the scene as a real event.\n`;
+        c += `2. Character texts {{user}}'s phone → one tag per message: <!--tel:sms:{"from":"X","text":"..."}--> (MMS: +"photo":"desc"; group chat: +"chat":"Name"; voice message: +"voice":true, "text" = transcript of what they say; screenshot of an EXISTING post: +"shot":{"app":"tw|ig|ch","author":"post author","text":"the post's own text"}). Only if they plausibly have {{user}}'s number and are NOT listed as BLOCKED. ONLY {{user}}'s phone: what OTHER characters receive on their phones — prose only, NEVER a tag.\n`;
+        c += `3. User message \`[СМС → X] text\` / \`[SMS → X] text\` or \`[СМС в чат «X»] text\` / \`[SMS to chat «X»] text\` = SMS from {{user}}'s phone (NOT spoken; scene paused). \`[Голосовое → X]\` / \`[Voice → X]\` = {{user}}'s VOICE message, text = transcript (the character hears {{user}}'s voice). Reply ONLY with tel:sms tags (or <!--tel:silent--> if the character wouldn't answer) — zero visible prose. Resume prose on {{user}}'s next normal message, weaving the texting into the scene as a real event.\n`;
         c += `4. Character posts publicly → <!--tel:tweet:{"author":"X","text":"..."}--> / <!--tel:insta:{"author":"X","photo":"desc","caption":"..."}-->\n`;
-        if (getSettings().groupAmbient && groupMap.size > 0) {
-            c += `4b. ACTIVE GROUP CHATS: the group chats above are alive without {{user}}. When time passes or the scene allows, members may text EACH OTHER there (gossip, plans, running jokes, mentions of other members) — only the groups listed above, never invent one: <!--tel:sms:{"from":"Member","chat":"GroupName","text":"..."}--> — a short burst of 2-4 tags at most, occasionally, only when it fits. Never speak for {{user}} in them.\n`;
-        }
         c += `NEVER write literal tag syntax inside <think>/reasoning — plan in plain words; each tag exactly once, in the final reply. Never paraphrase tags into visible text.\n`;
         let socialC = '';
         try { socialC = getSocialActivitySummary(); } catch (e) { /* ignore */ }
@@ -139,10 +134,6 @@ function buildPrompt() {
             }
         } catch (e) { /* ignore */ }
         try {
-            const workLine = workInjectLine();
-            if (workLine) c += `\n[{{user}}'S JOB]\n${workLine}\n`;
-        } catch (e) { /* ignore */ }
-        try {
             const notesBlock = notesInjectBlock();
             if (notesBlock) c += `\n${notesBlock}\n`;
         } catch (e) { /* ignore */ }
@@ -159,7 +150,14 @@ function buildPrompt() {
             if (tin) c += `\n${tin}\n`;
         } catch (e) { /* ignore */ }
         c += `NEVER write <!--tel:log--> or lines starting with «[Событие мира» — that is the app's own journal format; a reply containing it gets hidden from the reader.\n`;
-        c += `TEXTING VOICE — text/tweet/caption/chan/tinder message content is gen-z texting, not prose: all lowercase always (incl. "i"), no end punctuation, light slang (u, ur, rn, ngl, fr, lowkey, tbh, istg, no cap, iykyk...), occasional elongation ("soooo") or emoji/caps for genuine emotion, phone-length messages (split into multiple tags if they'd double-text). Default for casual characters; formal/older characters can text properly instead.\n`;
+        // Era-aware texting voice: a Y2K era replaces the modern gen-z voice with
+        // period-appropriate slang/emoticons; "modern" era keeps the original line.
+        const _eraHintC = eraTextspeakHint();
+        if (_eraHintC) {
+            c += _eraHintC + '\n';
+        } else {
+            c += `TEXTING VOICE — text/tweet/caption/chan/tinder message content is gen-z texting, not prose: all lowercase always (incl. "i"), no end punctuation, light slang (u, ur, rn, ngl, fr, lowkey, tbh, istg, no cap, iykyk...), occasional elongation ("soooo") or emoji/caps for genuine emotion, phone-length messages (split into multiple tags if they'd double-text). Default for casual characters; formal/older characters can text properly instead.\n`;
+        }
         c += `</phone_directive>`;
         return c;
     }
@@ -193,14 +191,15 @@ function buildPrompt() {
     p += `Optional fields: "shot":{"app":"tw|ig|ch","author":"who posted it","text":"the post's own text"} — they forward a SCREENSHOT of a post that ALREADY exists (a tweet, an Instagram post, a channel post they or {{user}} can see); quote enough of its text for the app to find it · "photo":"what the photo shows" (MMS) · "voice":true — then "text" is the transcript of what they SAY, spoken register (use when it fits the moment, not every message)${hasGroups ? ' · "chat":"GroupChatName" for a group chat, where several members may text in a row (one tag each)' : ''}.\n`;
     p += `You may also narrate the buzz in prose and show the text in your usual visible style (backticks). Duplicate as a tag ONLY what {{user}} receives. Only characters who plausibly have {{user}}'s number can text {{user}}.\n`;
     p += `NEVER emit a tel:sms whose "from" is {{user}} — their own messages are sent from the app, not written by you.\n`;
-    p += `CRITICAL SCOPE: tel:sms is EXCLUSIVELY for messages arriving on {{user}}'s OWN phone. What ANY other character (including yours) gets on THEIR phone — prose only, NEVER a tag; if tagged anyway it MUST carry "to":"RecipientName" so the app discards it.\n`;
-    p += `[GROUP CHAT SCOPE] This is {{user}}'s phone, not a shared one. A "chat" (group) tag is ONLY for a group chat that INCLUDES {{user}} as a member: ${hasGroups ? 'one of the group chats listed above, or ' : ''}a NEW group that a character creates with {{user}} in it (put "user":true on that new group's first tag). Group chats between OTHER characters that do not include {{user}} (cousins texting each other, a friend group, a team chat, a family chat) happen off-screen: write them in prose or leave them out, NEVER as a tel:sms tag, and never say or imply that {{user}} was added to or can see them. {{user}} is not in a group chat unless the story or the list above says so.\n`;
-    p += `[LEFT ON READ] Not only during phone-only turns: any time a character would glance at an unanswered text from {{user}} in the middle of a normal scene and choose not to reply, append <!--tel:seen:{"from":"CharacterName"}--> (or "chat":"GroupChatName") at the END — this flips {{user}}'s last message from "Delivered" to "Read" with no new message, letting {{user}} feel ignored/avoided in-story. Use sparingly and only when it fits the character's mood or relationship dynamic.\n\n`;
+    p += `CRITICAL SCOPE: tel:sms is EXCLUSIVELY for messages arriving on {{user}}'s OWN phone. What ANY other character (including yours) gets on THEIR phone — prose only, NEVER a tag; if tagged anyway it MUST carry "to":"RecipientName" so the app discards it.\n\n`;
 
-    p += `[TEXTING VOICE] The "text"/"caption" content of every tel:sms, tel:tweet, tel:insta, tel:chan, and Tinder message is typed on a phone, not written prose — it needs to read like an actual text, not a formal sentence with the caps and periods swapped out. All lowercase, always, including "i" and the start of the message — not optional. Drop the period at the end of a thought; use commas rarely. Contract and clip words the way real typing does: u, ur, rn, ngl, fr, lowkey/highkey, ong, ts, tbh, istg, deadass, no cap, bet, say less, iykyk, wyd, hbu, omw, idk, ig — pull from this pool, don't force one into every line. Elongate for emphasis sometimes ("soooo", "pleaseee"). Emoji and reaction-caps ("NOOO", "???", "LMAOO") are fair game for genuine emotional beats but shouldn't be in every message. Keep messages phone-length — a few words to a short sentence — splitting into multiple tags rather than one long paragraph if the character would double/triple text. This is the DEFAULT voice for casual characters; an older, more formal, or professional-context character (a channel's official post, say) can write properly instead.\n\n`;
-
-    if (getSettings().groupAmbient && hasGroups) {
-        p += `[ACTIVE GROUP CHATS] The group chats listed above are alive on their own — they are not only about {{user}}. When time passes or the scene allows (a quiet moment, a scene change, an evening), group members may text EACH OTHER in those chats even when {{user}} is not part of the exchange: gossip, plans, running jokes, reacting to each other's lives, mentioning other members. Output one <!--tel:sms:{"from":"MemberName","chat":"GroupChatName","text":"..."}--> tag per message at the END, same format as any group message. Keep it occasional and short — a burst of 2-4 messages at most per reply, only when it fits the scene and each member's personality. Never write messages as {{user}}, and members who are not in that group cannot appear in it. Only use the groups listed above — never invent a new group chat for this, and never put {{user}}'s characters' private chats between OTHER people here.\n\n`;
+    // Era-aware texting voice: a Y2K era replaces the modern gen-z voice with
+    // period-appropriate slang/emoticons; "modern" era keeps the original line.
+    const _eraHint = eraTextspeakHint();
+    if (_eraHint) {
+        p += _eraHint + '\n\n';
+    } else {
+        p += `[TEXTING VOICE] The "text"/"caption" content of every tel:sms, tel:tweet, tel:insta, tel:chan, and Tinder message is typed on a phone, not written prose — it needs to read like an actual text, not a formal sentence with the caps and periods swapped out. All lowercase, always, including "i" and the start of the message — not optional. Drop the period at the end of a thought; use commas rarely. Contract and clip words the way real typing does: u, ur, rn, ngl, fr, lowkey/highkey, ong, ts, tbh, istg, deadass, no cap, bet, say less, iykyk, wyd, hbu, omw, idk, ig — pull from this pool, don't force one into every line. Elongate for emphasis sometimes ("soooo", "pleaseee"). Emoji and reaction-caps ("NOOO", "???", "LMAOO") are fair game for genuine emotional beats but shouldn't be in every message. Keep messages phone-length — a few words to a short sentence — splitting into multiple tags rather than one long paragraph if the character would double/triple text. This is the DEFAULT voice for casual characters; an older, more formal, or professional-context character (a channel's official post, say) can write properly instead.\n\n`;
     }
 
     // Самый жирный блок — только в телефонный ход
@@ -208,8 +207,7 @@ function buildPrompt() {
         p += `[RULE 3 — PHONE-ONLY MODE — ACTIVE NOW] Their last message came FROM THEIR PHONE: \`[СМС → Name]\`/\`[SMS → Name]\` (direct), \`[СМС в чат «Name»]\`/\`[SMS to chat «Name»]\` (group — reply as its members, each with "chat"), \`[Голосовое → Name]\`/\`[Voice → Name]\` (voice message: text is the transcript, the character HEARS {{user}}'s voice), \`*фото*\`/\`*photo*\` (photo attached — look at it if you can see images).\n`;
         p += `It is NOT spoken aloud and the RP scene is PAUSED. Your reply MUST be ONLY hidden tags — zero visible prose, narration or actions:\n`;
         p += `- 1-5 <!--tel:sms:...--> tags in the character's own texting voice: short, informal, realistic pacing.\n`;
-        p += `- If they realistically would NOT reply now (asleep, busy, offended, phone off — phone never opened), output exactly: <!--tel:silent-->\n`;
-        p += `- If they WOULD open the phone and see the message, but choose not to answer right now (busy, thinking, avoiding, playing it cool, mad, distracted) — this is being "left on read": output <!--tel:seen:{"from":"CharacterName"}--> (or "chat":"GroupChatName" for a group) instead of an sms tag. This marks the message as seen without sending a reply — different from tel:silent, which means the phone was never even opened.\n\n`;
+        p += `- If they realistically would NOT reply now (asleep, busy, offended, phone off), output exactly: <!--tel:silent-->\n\n`;
     } else if (phoneTurn === 'justEnded') {
         p += `[RULE 3 — RESUMING AFTER TEXTING] The previous exchange happened on {{user}}'s phone. Weave it into the scene as a real event: {{user}} was holding the phone, reading and typing — it took time and attention, and others present may have noticed. Do NOT resume as if nothing happened.\n\n`;
     }
@@ -253,11 +251,6 @@ function buildPrompt() {
         if (getPlans().length) p += `\n${plansInjectRule()}\n`;
         const plans = plansInjectLine();
         if (plans) p += `\n${plans}\n`;
-    } catch (e) { /* ignore */ }
-    // Work: characters who know {{user}} may ask about it
-    try {
-        const workLine = workInjectLine();
-        if (workLine) p += `\n[{{user}}'S JOB — established fact]\n${workLine}\n`;
     } catch (e) { /* ignore */ }
     // Заметки — только расшаренные (секретные не инжектятся никогда)
     try {
