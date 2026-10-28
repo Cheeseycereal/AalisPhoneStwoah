@@ -53,6 +53,20 @@ function setupSettingsPanel() {
                     <option value="y2k-late" ${s.era === 'y2k-late' ? 'selected' : ''}>Late Y2K — 2009–2011 · BlackBerry, early Twitter</option>
                 </select></label>
                 <div class="gp-settings-wide gp-settings-note" id="gp-era-hint" style="opacity:.75"></div>
+                <div class="gp-settings-checks gp-settings-wide">
+                    <label><input type="checkbox" id="gp-set-stricte" ${s.strictEra ? 'checked' : ''}><span>Strict era — hide apps that didn't exist yet in this era</span></label>
+                </div>
+                <div class="gp-settings-wide gp-settings-note" style="opacity:.6">Off by default: era is vibes-only (texting voice + default shell). All apps stay on your home screen so you can have an Instagram on a flip phone if you want.</div>
+            </div>
+        </details>
+
+        <details class="gp-settings-group">
+            <summary><i class="fa-solid fa-wand-sparkles"></i><span><b>Prompts</b><small>Edit what the extension tells the model</small></span><i class="fa-solid fa-chevron-down gp-settings-chevron"></i></summary>
+            <div class="gp-settings-group-body gp-settings-grid">
+                <div class="gp-settings-wide gp-settings-note">Power-user overrides for the phone directive. Leave empty to use the extension's own defaults. Edits here apply to every chat and take effect on the next message.</div>
+                <label class="gp-settings-field gp-settings-wide"><span>Texting voice override</span><textarea id="gp-set-voiceover" class="text_pole" rows="6" placeholder="Leave empty to use the auto texting voice (modern gen-z, or the era voice if a Y2K era is on). Fill in to replace it with your own — e.g. a specific slang list, formal register, bilingual code-switching, etc."></textarea><small>Replaces the [TEXTING VOICE] block for every message/post/caption.</small></label>
+                <label class="gp-settings-field gp-settings-wide"><span>Extra instructions</span><textarea id="gp-set-extraprompt" class="text_pole" rows="6" placeholder="Appended to the end of the phone directive on every reply. Use for standing instructions — e.g. 'NPCs should sign off with their first initial', 'use UK English', 'always address the user as babe'."></textarea><small>Added at the end — can shade or override anything above.</small></label>
+                <div class="gp-settings-wide gp-settings-align-end"><button class="menu_button" id="gp-prompts-reset" type="button">Reset both to default</button></div>
             </div>
         </details>
 
@@ -237,6 +251,33 @@ function setupSettingsPanel() {
         }
     };
     updateEraHint();
+    $('#gp-set-stricte').on('change', function () {
+        getSettings().strictEra = this.checked;
+        saveSettingsDebounced();
+        try { if (isPhoneOpen()) render(); } catch (e) { /* ignore */ }
+    });
+    // Prompt overrides — fill the textareas with the current values and save on blur
+    $('#gp-set-voiceover').val(getSettings().textingVoiceOverride || '');
+    $('#gp-set-extraprompt').val(getSettings().extraPrompt || '');
+    $('#gp-set-voiceover').on('change', function () {
+        getSettings().textingVoiceOverride = String(this.value || '');
+        saveSettingsDebounced();
+        updatePhoneInjection();
+    });
+    $('#gp-set-extraprompt').on('change', function () {
+        getSettings().extraPrompt = String(this.value || '');
+        saveSettingsDebounced();
+        updatePhoneInjection();
+    });
+    $('#gp-prompts-reset').on('click', function () {
+        if (!confirm('Clear both prompt overrides and go back to the extension defaults?')) return;
+        getSettings().textingVoiceOverride = '';
+        getSettings().extraPrompt = '';
+        $('#gp-set-voiceover').val('');
+        $('#gp-set-extraprompt').val('');
+        saveSettingsDebounced();
+        updatePhoneInjection();
+    });
     $('#gp-set-era').on('change', function () {
         const st = getSettings();
         const prev = st.era || 'modern';
