@@ -20,19 +20,6 @@ const defaultSettings = () => ({
     // Прятать смс-переписку из ленты чата (сообщения ОСТАЮТСЯ в истории и контексте
     // модели — скрывается только отображение; телефон это единственное «окно» в смс)
     hideSmsInChat: true,
-    // Спрашивать подтверждение перед тем, как сгенерировать соцсеть-профиль
-    // (био) для персонажа, которого раньше не было на Instagram — например,
-    // когда он впервые постит сторис. false = генерировать молча.
-    confirmAutoProfile: true,
-    // Показывать приложение OnlyFans на домашнем экране (false = скрыто совсем,
-    // и в инжект модели оно тоже не попадает)
-    ofEnabled: true,
-    // Work app (jobs, shifts, promotions; ported from Delidgi-meow/Phone-ST).
-    // Off = app hidden and nothing about work reaches the model.
-    workEnabled: false,
-    // Живые групповые чаты: участники сами переписываются между собой, даже когда
-    // {{user}} в разговоре не участвует. Выкл по умолчанию — тратит токены.
-    groupAmbient: false,
     // Профиль подключения для генерации соцсетей ('' = текущий API через generateRaw,
     // изолированно от пресета). Отдельный профиль дополнительно включает вижн.
     socialProfileId: '',
@@ -55,19 +42,6 @@ const defaultSettings = () => ({
     // Какое картинко-расширение брать, если установлено несколько
     // ('' = автоматически: настроенное побеждает пустое)
     imageCfgKey: '',
-    // Откуда рисовать картинки:
-    // 'st'   — встроенная генерация картинок SillyTavern (команда /sd), берёт
-    //          ТВОИ настройки из панели Image Generation в ST — ничего не надо
-    //          вводить второй раз;
-    // 'auto' — прямой API Phone-ST (поля ниже) или найденное сторонее расширение.
-    imageBackend: 'st',
-    // ПРЯМАЯ конфигурация картинок Phone-ST, без стороннего расширения вообще.
-    // Если тут заполнено (apiKey + модель в imageGenModel + endpoint/naistera),
-    // это ведро побеждает любое найденное стороннее расширение — телефон
-    // рисует сам, напрямую через API.
-    imageApiType: 'openai', // 'openai' | 'gemini' | 'naistera'
-    imageApiEndpoint: '',
-    imageApiKey: '',
     // Генерация картинок: модель-оверрайд ('' = модель из настроек расширения)
     imageGenModel: '',
     // Модель расширения на момент выбора оверрайда: если её там сменили,
@@ -135,7 +109,14 @@ const defaultSettings = () => ({
     tinder: true,
     // Сколько админ канала берёт за первое имя. Дальше цена растёт кратно.
     anonRevealPrice: 2500,
-    // Соц-системы: подписчики, охваты, репутация, сюжетные ивенты, реклама.
+    // Era preset for the Y2K update. 'modern' = everything as it is;
+    // 'y2k-early' | 'y2k-mid' | 'y2k-late' hide apps that didn't exist yet
+    // and bias the AI's texting voice toward period slang / emoticons.
+    era: 'modern',
+    // Internal — set to true after we've suggested the matching phone shell on
+    // first era switch, so we don't nag again if the user picked a different one.
+    eraSkinSuggested: '',
+        // Соц-системы: подписчики, охваты, репутация, сюжетные ивенты, реклама.
     // Выключено — соцсети остаются, но постишь просто так, без цифр и поворотов.
     socialSystems: true,
 });
@@ -971,31 +952,12 @@ function scanChatUncached() {
     const contacts = new Map();
     const threads = new Map();
 
-    // Renamed contacts. renameContact() only changes the DISPLAY name (meta.names),
-    // but a text addressed to that new name used to be treated as a brand-new
-    // contact (new thread, empty number, the model invents another one). Map the
-    // chosen display name back to the original key so it stays one person.
-    const aliasKeys = new Map();
-    try {
-        for (const [origKey, shown] of Object.entries(getMeta().names || {})) {
-            if (origKey.startsWith('group:')) {
-                const gk = `group:${keyOf(shown)}`;
-                if (gk !== origKey && !aliasKeys.has(gk)) aliasKeys.set(gk, origKey);
-            } else {
-                const nk = keyOf(shown);
-                if (nk && nk !== origKey && !aliasKeys.has(nk)) aliasKeys.set(nk, origKey);
-            }
-        }
-    } catch (e) { /* ignore */ }
-    const kOf = (name) => { const k = keyOf(name); return aliasKeys.get(k) || k; };
-    const gKeyOf = (name) => { const k = `group:${keyOf(name)}`; return aliasKeys.get(k) || k; };
-
     const addContact = (name, number, source) => {
-        const k = kOf(name);
+        const k = keyOf(name);
         if (!k) return;
         const existing = contacts.get(k);
         if (!existing) {
-            contacts.set(k, { name: k !== keyOf(name) ? k : String(name).trim(), number: String(number || '').trim(), source });
+            contacts.set(k, { name: String(name).trim(), number: String(number || '').trim(), source });
         } else if (!existing.number && number) {
             existing.number = String(number).trim();
         }
@@ -1003,7 +965,7 @@ function scanChatUncached() {
 
     // name может быть готовым ключом 'group:xxx' (displayName тогда обязателен)
     const pushMsg = (name, entry, displayName = null) => {
-        const k = String(name).startsWith('group:') ? String(name) : kOf(name);
+        const k = String(name).startsWith('group:') ? String(name) : keyOf(name);
         if (!k || k === 'group:') return;
         if (!threads.has(k)) {
             threads.set(k, {
@@ -1058,25 +1020,6 @@ function scanChatUncached() {
         if (offsets[i] === null) offsets[i] = firstKnown;
     }
 
-    // Group chats that really include {{user}}: ones they created by hand, and ones they
-    // have texted into. A group tag for any other group is the model describing a chat
-    // between OTHER characters (two cousins, a friend group) — it must not land on
-    // {{user}}'s phone, and {{user}} must not be written into it.
-    const userGroupKeys = new Set();
-    try {
-        for (const g of (getMeta().groups || [])) if (g && g.name) userGroupKeys.add(gKeyOf(g.name));
-        for (const m of chat) {
-            if (!m || !m.is_user || !m.mes) continue;
-            const t = stripThink(m.mes);
-            const o = t.match(OUT_RE);
-            if (!o) continue;
-            const oj = safeJson(o[1]) || {};
-            const vg = t.replace(OUT_RE, '').trim().match(OUT_VISIBLE_GROUP_RE);
-            const gn = oj.group || (typeof oj.to === 'string' && oj.to.match(/^группа:\s*(.+)$/i)?.[1]) || (vg ? vg[2].trim() : null);
-            if (gn) userGroupKeys.add(gKeyOf(gn));
-        }
-    } catch (e) { /* ignore */ }
-
     for (let i = 0; i < chat.length; i++) {
         const msg = chat[i];
         if (!msg || !msg.mes) continue;
@@ -1120,7 +1063,7 @@ function scanChatUncached() {
                 if (j.photo) entry.photoDesc = String(j.photo).slice(0, 200);
                 if (j.shot) entry.shot = j.shot;
                 if (groupName) {
-                    if (body || entry.img) pushMsg(gKeyOf(groupName), entry, groupName);
+                    if (body || entry.img) pushMsg(`group:${keyOf(groupName)}`, entry, groupName);
                 } else if (to && (body || entry.img)) {
                     pushMsg(to, entry);
                     // Раз юзер пишет этому имени — контакт точно есть
@@ -1161,17 +1104,6 @@ function scanChatUncached() {
                 if (!msg.is_user && isUserName(j.from)) {
                     continue;
                 }
-                // Исключение четвёртое: групповой чат, в котором {{user}} не состоит.
-                // Состоит — если группа заведена руками, юзер в неё писал, ИЛИ модель
-                // явно пометила тег "user":true (новую группу с юзером). Иначе это
-                // переписка между другими персонажами.
-                if (j.chat && !msg.is_user) {
-                    const gk = gKeyOf(j.chat);
-                    if (!userGroupKeys.has(gk)) {
-                        if (j.user === true || (j.to && isUserName(j.to))) userGroupKeys.add(gk);
-                        else continue;
-                    }
-                }
                 // Заблокированный контакт не создаёт пузырь/непрочитанное. Проверка
                 // идёт по историческому интервалу, поэтому блок переживает reload,
                 // а разблокировка не возвращает пропущенные сообщения задним числом.
@@ -1198,7 +1130,7 @@ function scanChatUncached() {
                 if (j.shot) entry.shot = j.shot;
                 if (j.chat) {
                     // Сообщение в групповой чат
-                    pushMsg(gKeyOf(j.chat), entry, String(j.chat));
+                    pushMsg(`group:${keyOf(j.chat)}`, entry, String(j.chat));
                 } else {
                     pushMsg(j.from, entry);
                     addContact(j.from, j.number || '', 'implicit');
@@ -1215,7 +1147,7 @@ function scanChatUncached() {
             while ((sm = SEEN_RE.exec(text)) !== null) {
                 const j = safeJson(sm[1]);
                 if (!j || !j.from) continue;
-                const k = j.chat ? gKeyOf(j.chat) : kOf(j.from);
+                const k = j.chat ? `group:${keyOf(j.chat)}` : keyOf(j.from);
                 if (!k || k === 'group:') continue;
                 if (!threads.has(k)) {
                     threads.set(k, { name: j.chat ? String(j.chat) : String(j.from).trim(), messages: [], isGroup: k.startsWith('group:') });
@@ -1233,7 +1165,7 @@ function scanChatUncached() {
             const proseNum = detectProseNumber(text.replace(/<!--[\s\S]*?-->/g, ''));
             if (proseNum) {
                 const charName = msg.name || null;
-                if (charName && !contacts.has(kOf(charName))) {
+                if (charName && !contacts.has(keyOf(charName))) {
                     addContact(charName, proseNum, 'prose');
                 }
             }
@@ -1302,8 +1234,6 @@ export function getThreadList() {
         list.push({
             key: k,
             name: displayName(k, (g && g.name) || (c && c.name) || (t && t.name) || k),
-            // Original name the model knows this contact by (name above is the renamed display name)
-            origName: (g && g.name) || (c && c.name) || (t && t.name) || k,
             number: (c && c.number) || '',
             isGroup,
             members: g ? g.members : (isGroup ? [...new Set(msgs.filter(m => m.from).map(m => m.from))] : []),
