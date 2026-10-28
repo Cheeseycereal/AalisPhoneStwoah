@@ -386,7 +386,10 @@ function createPhone() {
 }
 
 // ═══ Скины и кастомный CSS ═══
-const SKINS = ['indigo', 'quiet', 'sunset', 'zephyr', 'neon', 'noir', 'fern', 'lcd', 'void', 'porcelain', 'minimal', 'flip', 'sidekick', 'bbry'];
+const SKINS = ['indigo', 'quiet', 'sunset', 'zephyr', 'neon', 'noir', 'fern', 'lcd', 'void', 'porcelain', 'minimal',
+    'flip', 'flip-pink', 'flip-ice',
+    'sidekick', 'sidekick-pink', 'sidekick-blk',
+    'bbry', 'bbry-pearl', 'bbry-rose'];
 
 // Варианты уведомлений. Разметка у всех одна — отличается только оформление,
 // поэтому переключение не трогает ни один из ~40 вызовов toast().
@@ -414,9 +417,15 @@ const THEME_INFO = [
     { id: 'porcelain', name: 'Porcelain', note: 'Светлый день', colors: ['#5a92ff', '#3a7bfd', '#a9c2ff'] },
     { id: 'minimal', name: 'Минимал', note: 'Строгие грани', colors: ['#8e8e93', '#c7c7cc', '#3a3a3c'] },
     // Y2K shells — switchable from Settings → Era, or picked directly here
-    { id: 'flip', name: 'Flip Phone', note: 'Y2K · 2000–2004', colors: ['#c8d680', '#8aa83a', '#1a1b14'] },
-    { id: 'sidekick', name: 'Sidekick', note: 'Y2K · 2005–2008', colors: ['#ff6b1c', '#ffb169', '#2b1d14'] },
-    { id: 'bbry', name: 'BlackBerry', note: 'Y2K · 2009–2011', colors: ['#c8102e', '#ff4d6a', '#1c1e26'] },
+    { id: 'flip', name: 'Flip', note: 'Y2K · phosphor', colors: ['#c8d680', '#8aa83a', '#1a1b14'] },
+    { id: 'flip-pink', name: 'Flip · Bubblegum', note: 'Y2K · candy pink', colors: ['#ff9ec0', '#d96894', '#3a1d2a'] },
+    { id: 'flip-ice', name: 'Flip · Ice', note: 'Y2K · crystal blue', colors: ['#c8dcf0', '#7a9ac4', '#1a2338'] },
+    { id: 'sidekick', name: 'Sidekick', note: 'Y2K · T-Mobile orange', colors: ['#ff6b1c', '#ffb169', '#2b1d14'] },
+    { id: 'sidekick-pink', name: 'Sidekick · Princess', note: 'Y2K · hot pink', colors: ['#ff2d8f', '#ff85c0', '#241a24'] },
+    { id: 'sidekick-blk', name: 'Sidekick · Onyx', note: 'Y2K · slick black', colors: ['#e8e8f0', '#c0c0c8', '#0e0e14'] },
+    { id: 'bbry', name: 'BlackBerry', note: 'Y2K · dark corp.', colors: ['#c8102e', '#ff4d6a', '#1c1e26'] },
+    { id: 'bbry-pearl', name: 'BBerry · Pearl', note: 'Y2K · white + mint', colors: ['#f8f6f0', '#4a9b7a', '#d8d4c8'] },
+    { id: 'bbry-rose', name: 'BBerry · Rose', note: 'Y2K · pink + gold', colors: ['#fbe3ea', '#d9709e', '#e6c98f'] },
 ];
 
 function hexRgb(hex) {
