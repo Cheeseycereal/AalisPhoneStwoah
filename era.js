@@ -68,6 +68,9 @@ export function isAppAllowedInEra(appId) {
     const era = getEra();
     if (!era.apps) return true;
     if (ALWAYS_ON.has(appId)) return true;
+    // Vibe mode: era hint still applies to texting voice and tile labels, but
+    // every app stays on the home screen. Strict mode brings the filter back.
+    if (!getSettings().strictEra) return true;
     return era.apps.has(appId);
 }
 
