@@ -4573,3 +4573,36 @@ body.gp-era-y2k-late #gp-overlay {
     -webkit-backdrop-filter: blur(1px) !important;
     background: rgba(0, 0, 0, 0.55) !important;
 }
+
+/* ─── MySpace tile (Mid Y2K rebrand of the Instagram app) ─── */
+/* The underlying app is still "ig" — only the home tile and the screen header */
+/* change, so profiles/posts/generation keep working. Classic MySpace blue.    */
+.gp-app-icon.gp-app-myspace {
+    background: linear-gradient(145deg, #3a76c0, #002864) !important;
+    color: #ffffff !important;
+    border: 1px solid #5b94db !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 2px 4px rgba(0,0,0,.5) !important;
+}
+/* MySpace flavor header on the IG screen — shows up only in Mid Y2K */
+body.gp-era-y2k-mid .gp-ig-banner-myspace {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: linear-gradient(180deg, #3a76c0 0%, #002864 100%);
+    color: #ffffff;
+    font-family: "Trebuchet MS", "Verdana", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.3px;
+    border-bottom: 2px solid #ffcc00;
+}
+body.gp-era-y2k-mid .gp-ig-banner-myspace::before {
+    content: 'a place for friends';
+    font-weight: 400;
+    font-style: italic;
+    font-size: 10px;
+    opacity: 0.85;
+    margin-left: auto;
+}
+body:not(.gp-era-y2k-mid) .gp-ig-banner-myspace { display: none; }
