@@ -1,10 +1,10 @@
 import { eventSource, event_types, saveSettingsDebounced } from '../../../../script.js';
 import { getSettings, GP_VERSION, invalidateChatCache, factoryReset, wipePhoneTraces } from './state.js';
+import { ERAS, getEra } from './era.js';
 import { updatePhoneInjection } from './prompts.js';
 import { initUI, checkNewIncoming, resetIncomingCounters, updateFabBadge, render, isPhoneOpen, closePhone, applySkin, applyWallpaper, applyChatHiding, toast, notifyBankReminders, notifyDeliveries, deliverScamSms } from './ui.js';
 import { harvestSocialTags, setUserHandle, getUserHandle, listIigProfiles, listIigStyles, listImageBuckets, currentExtModel, stripFakeJournal, resetImageExtCache } from './social.js';
 import { harvestBankTags } from './bank.js';
-import { harvestWorkTags } from './work.js';
 import { harvestPlanTags } from './plans.js';
 import { harvestChannelTags, harvestAnonTags, harvestAnonBust, ANON_NAME } from './channels.js';
 import { maybeScamSms } from './scam.js';
@@ -43,6 +43,20 @@ function setupSettingsPanel() {
         </div>
 
         <details class="gp-settings-group">
+            <summary><i class="fa-solid fa-clock-rotate-left"></i><span><b>Era</b><small>Y2K time-period preset — reshapes the phone and the apps that exist</small></span><i class="fa-solid fa-chevron-down gp-settings-chevron"></i></summary>
+            <div class="gp-settings-group-body gp-settings-grid">
+                <div class="gp-settings-wide gp-settings-note">Picks a time period for the whole phone. "Modern" is everything as usual. Y2K eras hide apps that didn't exist yet (nothing is deleted; apps come back when the era allows them) and switch the AI's texting voice to period slang / emoticons. Changing era can also suggest the matching phone shell.</div>
+                <label class="gp-settings-field gp-settings-wide"><span>Era</span><select id="gp-set-era" class="text_pole">
+                    <option value="modern" ${(s.era || 'modern') === 'modern' ? 'selected' : ''}>Modern — present day · everything on</option>
+                    <option value="y2k-early" ${s.era === 'y2k-early' ? 'selected' : ''}>Early Y2K — 2000–2004 · flip phone, SMS only</option>
+                    <option value="y2k-mid" ${s.era === 'y2k-mid' ? 'selected' : ''}>Mid Y2K — 2005–2008 · Sidekick, early blogs</option>
+                    <option value="y2k-late" ${s.era === 'y2k-late' ? 'selected' : ''}>Late Y2K — 2009–2011 · BlackBerry, early Twitter</option>
+                </select></label>
+                <div class="gp-settings-wide gp-settings-note" id="gp-era-hint" style="opacity:.75"></div>
+            </div>
+        </details>
+
+        <details class="gp-settings-group">
             <summary><i class="fa-solid fa-layer-group"></i><span><b>Модель и контекст</b><small>Профиль, история и параметры ответа</small></span><i class="fa-solid fa-chevron-down gp-settings-chevron"></i></summary>
             <div class="gp-settings-group-body gp-settings-grid">
                 <label class="gp-settings-field"><span>Глубина инжекта</span><input type="number" id="gp-set-depth" class="text_pole gp-settings-number" min="0" max="100" step="1" value="${Math.max(0, Number(s.injectDepth) || 0)}"><small>0 — перед последним ходом</small></label>
@@ -54,9 +68,6 @@ function setupSettingsPanel() {
                 <div class="gp-settings-checks gp-settings-wide">
                     <label><input type="checkbox" id="gp-set-hide" ${s.hideSmsInChat !== false ? 'checked' : ''}><span>Скрывать смс-переписку из ленты чата</span></label>
                     <label><input type="checkbox" id="gp-set-confirmprofile" ${s.confirmAutoProfile !== false ? 'checked' : ''}><span>Confirm before auto-generating a character's Instagram profile</span></label>
-                    <label><input type="checkbox" id="gp-set-ofenabled" ${s.ofEnabled !== false ? 'checked' : ''}><span>Show the OnlyFans app</span></label>
-                    <label><input type="checkbox" id="gp-set-workenabled" ${s.workEnabled ? 'checked' : ''}><span>Work app — jobs, shifts and promotions (a shift costs one generation when you press the button)</span></label>
-                    <label><input type="checkbox" id="gp-set-groupambient" ${s.groupAmbient ? 'checked' : ''}><span>Active group chats — members text each other without you (uses tokens)</span></label>
                     <label><input type="checkbox" id="gp-set-scam" ${s.scamEnabled !== false ? 'checked' : ''}><span>Спам и мошенники в смс</span></label>
                     <label><input type="checkbox" id="gp-set-anon" ${s.anonChannel !== false ? 'checked' : ''}><span>Анонимка «Подслушано» в каналах</span></label>
                     <label><input type="checkbox" id="gp-set-prefill" ${s.usePrefill ? 'checked' : ''}><span>Префилл ответа</span></label>
@@ -68,23 +79,18 @@ function setupSettingsPanel() {
         <details class="gp-settings-group">
             <summary><i class="fa-solid fa-image"></i><span><b>Изображения</b><small>Модель, формат и промпты</small></span><i class="fa-solid fa-chevron-down gp-settings-chevron"></i></summary>
             <div class="gp-settings-group-body gp-settings-grid">
-                <label class="gp-settings-field gp-settings-wide"><span>Image source</span><select id="gp-set-imgbackend" class="text_pole">
-                    <option value="st">SillyTavern Image Generation (uses your ST settings)</option>
-                    <option value="auto">Direct API / other image extension</option>
-                </select></label>
-                <div class="gp-settings-wide gp-settings-note gp-img-st-note">Uses the Image Generation panel already set up in SillyTavern (source, model, style). Model and aspect ratio are chosen there. Make sure that extension is enabled and works with /sd.</div>
-                <div class="gp-settings-wide gp-settings-note gp-img-direct">Direct connection — no separate image-gen extension needed. Fill these in and the phone draws its own images.</div>
-                <label class="gp-settings-field gp-img-direct"><span>Image API type</span><select id="gp-set-imgapitype" class="text_pole">
+                <div class="gp-settings-wide gp-settings-note">Direct connection — no separate image-gen extension needed. Fill these in and the phone draws its own images.</div>
+                <label class="gp-settings-field"><span>Image API type</span><select id="gp-set-imgapitype" class="text_pole">
                     <option value="openai">OpenAI-compatible</option>
                     <option value="gemini">Google Gemini</option>
                     <option value="naistera">NovelAI (naistera)</option>
                 </select></label>
-                <label class="gp-settings-field gp-img-direct"><span>Image API endpoint</span><input type="text" id="gp-set-imgendpoint" class="text_pole" placeholder="https://..."></label>
-                <label class="gp-settings-field gp-settings-wide gp-img-direct"><span>Image API key</span><input type="password" id="gp-set-imgkey" class="text_pole" placeholder="sk-..." autocomplete="new-password"></label>
-                <label class="gp-settings-field gp-settings-wide gp-img-direct"><span>Модель картинок</span><span class="gp-settings-control-row"><input type="text" id="gp-set-imgmodel" class="text_pole" list="gp-imgmodels" placeholder="авто"><datalist id="gp-imgmodels"></datalist><button class="menu_button gp-settings-icon-button" id="gp-imgmodel-refresh" type="button" title="Загрузить список моделей" aria-label="Загрузить список моделей"><i class="fa-solid fa-rotate"></i></button></span></label>
+                <label class="gp-settings-field"><span>Image API endpoint</span><input type="text" id="gp-set-imgendpoint" class="text_pole" placeholder="https://..."></label>
+                <label class="gp-settings-field gp-settings-wide"><span>Image API key</span><input type="password" id="gp-set-imgkey" class="text_pole" placeholder="sk-..." autocomplete="new-password"></label>
+                <label class="gp-settings-field gp-settings-wide"><span>Модель картинок</span><span class="gp-settings-control-row"><input type="text" id="gp-set-imgmodel" class="text_pole" list="gp-imgmodels" placeholder="авто"><datalist id="gp-imgmodels"></datalist><button class="menu_button gp-settings-icon-button" id="gp-imgmodel-refresh" type="button" title="Загрузить список моделей" aria-label="Загрузить список моделей"><i class="fa-solid fa-rotate"></i></button></span></label>
                 <label class="gp-settings-field gp-hidden" id="gp-imgcfg-row"><span>Картинко-расширение</span><select id="gp-set-imgcfg" class="text_pole"></select></label>
-                <label class="gp-settings-field gp-img-direct"><span>Профиль картинко-расширения</span><select id="gp-set-imgprofile" class="text_pole"></select></label>
-                <label class="gp-settings-field gp-img-direct"><span>Стиль картинок телефона</span><select id="gp-set-imgstyle" class="text_pole"></select></label>
+                <label class="gp-settings-field"><span>Профиль картинко-расширения</span><select id="gp-set-imgprofile" class="text_pole"></select></label>
+                <label class="gp-settings-field"><span>Стиль картинок телефона</span><select id="gp-set-imgstyle" class="text_pole"></select></label>
                 <div class="gp-settings-checks gp-settings-wide">
                     <label><input type="checkbox" id="gp-set-square" ${s.imageGenSquare !== false ? 'checked' : ''}><span>Картинки постов — квадрат 1:1</span></label>
                     <label><input type="checkbox" id="gp-set-tagmode" ${s.imgTagMode ? 'checked' : ''}><span>Booru-теги (для NovelAI/аниме-моделей)</span></label>
@@ -121,19 +127,6 @@ function setupSettingsPanel() {
     $('#extensions_settings2').append(html);
     // Значения назначаются как свойства DOM, не интерполируются в HTML:
     // кавычки и </textarea> в пользовательских промптах/CSS безопасны.
-    $('#gp-set-imgbackend').val(s.imageBackend === 'auto' ? 'auto' : 'st');
-    const syncImgBackendUi = () => {
-        const isSt = ($('#gp-set-imgbackend').val() || 'st') === 'st';
-        $('#gp-settings-drawer .gp-img-direct').toggleClass('gp-hidden', isSt);
-        $('#gp-settings-drawer .gp-img-st-note').toggleClass('gp-hidden', !isSt);
-    };
-    syncImgBackendUi();
-    $('#gp-set-imgbackend').on('change', function () {
-        getSettings().imageBackend = this.value === 'auto' ? 'auto' : 'st';
-        saveSettingsDebounced();
-        resetImageExtCache();
-        syncImgBackendUi();
-    });
     $('#gp-set-imgapitype').val(s.imageApiType || 'openai');
     $('#gp-set-imgendpoint').val(s.imageApiEndpoint || '');
     $('#gp-set-imgkey').val(s.imageApiKey || '');
@@ -227,6 +220,46 @@ function setupSettingsPanel() {
         saveSettingsDebounced();
         updatePhoneInjection();
     });
+
+    // Era preset — reshapes the phone to a Y2K time period (or back to Modern).
+    // Nothing is deleted; apps hidden by an era come back when the era allows them.
+    // On first switch to a Y2K era we offer the matching phone shell as the default
+    // skin, but only once per era so we don't nag if the user picked something else.
+    const updateEraHint = () => {
+        const era = getEra();
+        const hint = document.getElementById('gp-era-hint');
+        if (!hint) return;
+        if (era.id === 'modern') {
+            hint.textContent = 'All apps visible. The AI\'s texting voice is default.';
+        } else {
+            const skinName = { flip: 'Flip Phone', sidekick: 'Sidekick', bbry: 'BlackBerry' }[era.defaultSkin] || '';
+            hint.textContent = `${era.name} · ${era.range}. Matching shell: ${skinName}. Change the shell in the Appearance app anytime.`;
+        }
+    };
+    updateEraHint();
+    $('#gp-set-era').on('change', function () {
+        const st = getSettings();
+        const prev = st.era || 'modern';
+        const next = this.value;
+        if (next === prev) return;
+        st.era = next;
+        saveSettingsDebounced();
+        updateEraHint();
+        const era = ERAS[next];
+        // Offer to switch to the era's matching phone shell on first switch into
+        // that era, unless the user already has that shell or already said no.
+        if (era && era.defaultSkin && st.skin !== era.defaultSkin && st.eraSkinSuggested !== next) {
+            st.eraSkinSuggested = next;
+            const skinName = { flip: 'Flip Phone', sidekick: 'Sidekick', bbry: 'BlackBerry' }[era.defaultSkin] || era.defaultSkin;
+            if (confirm(`${era.name} usually goes with the ${skinName} shell. Switch to it now? You can always change it later in Appearance.`)) {
+                st.skin = era.defaultSkin;
+            }
+            saveSettingsDebounced();
+        }
+        try { applySkin(); } catch (e) { /* ignore */ }
+        try { if (isPhoneOpen()) render(); } catch (e) { /* ignore */ }
+        try { updatePhoneInjection(); } catch (e) { /* ignore */ }
+    });
     $('#gp-set-depth').on('change', function () {
         const value = Math.max(0, Math.min(100, parseInt(this.value) || 0));
         this.value = value;
@@ -246,23 +279,6 @@ function setupSettingsPanel() {
     $('#gp-set-confirmprofile').on('change', function () {
         getSettings().confirmAutoProfile = this.checked;
         saveSettingsDebounced();
-    });
-    $('#gp-set-ofenabled').on('change', function () {
-        getSettings().ofEnabled = this.checked;
-        saveSettingsDebounced();
-        updatePhoneInjection();
-        if (isPhoneOpen()) render();
-    });
-    $('#gp-set-workenabled').on('change', function () {
-        getSettings().workEnabled = this.checked;
-        saveSettingsDebounced();
-        updatePhoneInjection();
-        if (isPhoneOpen()) render();
-    });
-    $('#gp-set-groupambient').on('change', function () {
-        getSettings().groupAmbient = this.checked;
-        saveSettingsDebounced();
-        updatePhoneInjection();
     });
     // Ник юзера хранится per-chat (в метаданных) — подставляем при открытии панели
     try { $('#gp-set-handle').val(getUserHandle().replace(/^@/, '')); } catch (e) { /* чат ещё не загружен */ }
@@ -519,11 +535,6 @@ jQuery(async () => {
             try {
                 const n = harvestBankTags();
                 if (n > 0) toast(`Банк: ${n} ${n === 1 ? 'операция' : 'операции'} из ролевой`, 'fa-building-columns');
-            } catch (e) { /* ignore */ }
-            // Shifts and tasks played out in the roleplay (Work app)
-            try {
-                const n = harvestWorkTags();
-                if (n > 0) toast(`Work: ${n} counted`, 'fa-briefcase');
             } catch (e) { /* ignore */ }
             // Посты, которые ролевая опубликовала в каналах
             try {
