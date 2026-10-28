@@ -36,7 +36,9 @@ export const ERAS = {
         id: 'y2k-mid',
         name: 'Mid Y2K',
         range: '2005–2008',
-        apps: new Set(['list', 'bank', 'shop', 'casino', 'news', 'chans']),
+        // ig is on this list because Mid Y2K rebrands it as MySpace (see igLabel below)
+        // — same app, same add-a-friend + tap-to-generate flows, period-correct label.
+        apps: new Set(['list', 'bank', 'shop', 'casino', 'news', 'chans', 'ig']),
         defaultSkin: 'sidekick',
         textspeak: 'mid',
     },
@@ -44,7 +46,8 @@ export const ERAS = {
         id: 'y2k-late',
         name: 'Late Y2K',
         range: '2009–2011',
-        apps: new Set(['list', 'bank', 'shop', 'casino', 'news', 'chans', 'tw']),
+        // ig = real Instagram (launched Oct 2010); tw = early Twitter (took off ~2009)
+        apps: new Set(['list', 'bank', 'shop', 'casino', 'news', 'chans', 'tw', 'ig']),
         defaultSkin: 'bbry',
         textspeak: 'late',
     },
@@ -72,6 +75,18 @@ export function isAppAllowedInEra(appId) {
 // whole phone (not just the skin)
 export function eraBodyClass() {
     return `gp-era-${getEra().id}`;
+}
+
+// Mid-Y2K rebrand of the Instagram app. The underlying app id stays "ig" so
+// profiles, posts, follow/unfollow and the whole generation pipeline keep
+// working — only the label and tile color on the home grid change.
+export function igLabel() {
+    return getEra().id === 'y2k-mid' ? 'MySpace' : 'Instagram';
+}
+export function igHomeStyle() {
+    // Returns { className: extra class to add to the tile icon } so ui.js can
+    // paint the home tile in MySpace blue in Mid Y2K and keep IG gradient elsewhere.
+    return getEra().id === 'y2k-mid' ? 'gp-app-myspace' : '';
 }
 
 // Prompt hint injected when a Y2K era is on. Replaces the modern "TEXTING VOICE"
