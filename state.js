@@ -110,12 +110,22 @@ const defaultSettings = () => ({
     // Сколько админ канала берёт за первое имя. Дальше цена растёт кратно.
     anonRevealPrice: 2500,
     // Era preset for the Y2K update. 'modern' = everything as it is;
-    // 'y2k-early' | 'y2k-mid' | 'y2k-late' hide apps that didn't exist yet
-    // and bias the AI's texting voice toward period slang / emoticons.
+    // 'y2k-early' | 'y2k-mid' | 'y2k-late' bias the AI's texting voice toward
+    // period slang / emoticons and suggest a matching phone shell.
     era: 'modern',
+    // Strict era: when ON, apps that didn't exist in the chosen era are hidden
+    // from the home screen. When OFF (default), era is pure vibes — pick any
+    // phone shell with any era texting voice, keep all your apps. The user
+    // asked for this to be loose: "it shouldnt have to matter what era ur in".
+    strictEra: false,
     // Internal — set to true after we've suggested the matching phone shell on
     // first era switch, so we don't nag again if the user picked a different one.
     eraSkinSuggested: '',
+    // Power-user prompt overrides. Both are empty by default (use the extension's
+    // own built-in text). When set, they're used verbatim by prompts.js — nothing
+    // is sanitized, so if you break the format the model may misbehave.
+    extraPrompt: '',             // appended to every phone directive
+    textingVoiceOverride: '',    // replaces the TEXTING VOICE / era-aware line
         // Соц-системы: подписчики, охваты, репутация, сюжетные ивенты, реклама.
     // Выключено — соцсети остаются, но постишь просто так, без цифр и поворотов.
     socialSystems: true,
