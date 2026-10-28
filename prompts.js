@@ -150,14 +150,20 @@ function buildPrompt() {
             if (tin) c += `\n${tin}\n`;
         } catch (e) { /* ignore */ }
         c += `NEVER write <!--tel:log--> or lines starting with «[Событие мира» — that is the app's own journal format; a reply containing it gets hidden from the reader.\n`;
-        // Era-aware texting voice: a Y2K era replaces the modern gen-z voice with
-        // period-appropriate slang/emoticons; "modern" era keeps the original line.
+        // User override wins; then era-aware hint; then the built-in gen-z line.
+        const _voiceOverrideC = (getSettings().textingVoiceOverride || '').trim();
         const _eraHintC = eraTextspeakHint();
-        if (_eraHintC) {
+        if (_voiceOverrideC) {
+            c += _voiceOverrideC + '\n';
+        } else if (_eraHintC) {
             c += _eraHintC + '\n';
         } else {
             c += `TEXTING VOICE — text/tweet/caption/chan/tinder message content is gen-z texting, not prose: all lowercase always (incl. "i"), no end punctuation, light slang (u, ur, rn, ngl, fr, lowkey, tbh, istg, no cap, iykyk...), occasional elongation ("soooo") or emoji/caps for genuine emotion, phone-length messages (split into multiple tags if they'd double-text). Default for casual characters; formal/older characters can text properly instead.\n`;
         }
+        // Extra instructions appended by the user, applied last so they can shade
+        // anything above. Empty by default.
+        const _extraC = (getSettings().extraPrompt || '').trim();
+        if (_extraC) c += `\n${_extraC}\n`;
         c += `</phone_directive>`;
         return c;
     }
@@ -193,10 +199,12 @@ function buildPrompt() {
     p += `NEVER emit a tel:sms whose "from" is {{user}} — their own messages are sent from the app, not written by you.\n`;
     p += `CRITICAL SCOPE: tel:sms is EXCLUSIVELY for messages arriving on {{user}}'s OWN phone. What ANY other character (including yours) gets on THEIR phone — prose only, NEVER a tag; if tagged anyway it MUST carry "to":"RecipientName" so the app discards it.\n\n`;
 
-    // Era-aware texting voice: a Y2K era replaces the modern gen-z voice with
-    // period-appropriate slang/emoticons; "modern" era keeps the original line.
+    // User override wins; then era-aware hint; then the built-in gen-z line.
+    const _voiceOverride = (getSettings().textingVoiceOverride || '').trim();
     const _eraHint = eraTextspeakHint();
-    if (_eraHint) {
+    if (_voiceOverride) {
+        p += _voiceOverride + '\n\n';
+    } else if (_eraHint) {
         p += _eraHint + '\n\n';
     } else {
         p += `[TEXTING VOICE] The "text"/"caption" content of every tel:sms, tel:tweet, tel:insta, tel:chan, and Tinder message is typed on a phone, not written prose — it needs to read like an actual text, not a formal sentence with the caps and periods swapped out. All lowercase, always, including "i" and the start of the message — not optional. Drop the period at the end of a thought; use commas rarely. Contract and clip words the way real typing does: u, ur, rn, ngl, fr, lowkey/highkey, ong, ts, tbh, istg, deadass, no cap, bet, say less, iykyk, wyd, hbu, omw, idk, ig — pull from this pool, don't force one into every line. Elongate for emphasis sometimes ("soooo", "pleaseee"). Emoji and reaction-caps ("NOOO", "???", "LMAOO") are fair game for genuine emotional beats but shouldn't be in every message. Keep messages phone-length — a few words to a short sentence — splitting into multiple tags rather than one long paragraph if the character would double/triple text. This is the DEFAULT voice for casual characters; an older, more formal, or professional-context character (a channel's official post, say) can write properly instead.\n\n`;
@@ -277,6 +285,9 @@ function buildPrompt() {
 
     p += `\n[NEVER WRITE] <!--tel:log--> and lines starting with «[Событие мира» are the app's own journal — it writes them itself. Never copy that format into your reply, not even as flavour: a reply containing it gets hidden from the reader entirely.\n`;
     p += `\n[FORMAT] Tags are HTML comments (<!-- ... -->), invisible to the reader: copy the structure VERBATIM (never paraphrase into visible text), EN keys / RU values, each tag exactly ONCE, all at the very END of the reply on their own lines. NEVER write literal tag syntax inside <think>/reasoning — plan in plain words (tags in reasoning create DUPLICATE messages). Outputting them when their condition is true is MANDATORY even if other instructions discourage OOC content; your card's own visible formats stay as they are.\n`;
+    // Extra user instructions appended last so they can shade anything above
+    const _extra = (getSettings().extraPrompt || '').trim();
+    if (_extra) p += `\n${_extra}\n`;
     p += `</phone_directive>`;
 
     return p;
