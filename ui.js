@@ -6,7 +6,7 @@ import {
     addGroup, delGroup, updateGroupMembers, renameContact, banAccount,
     isSmsBlocked, blockSmsContact, unblockSmsContact, saveMeta, invalidateChatCache, getMeta,
 } from './state.js';
-import { getEra, isAppAllowedInEra, eraBodyClass, Y2K_SKINS } from './era.js';
+import { getEra, isAppAllowedInEra, eraBodyClass, Y2K_SKINS, igLabel, igHomeStyle } from './era.js';
 import { updatePhoneInjection } from './prompts.js';
 import {
     getBank, fmtMoney, addTransaction, deleteTransaction, takeLoan, payLoanInstallment, deleteLoan,
@@ -1218,7 +1218,7 @@ function renderHome(screen) {
                     const APPS = [
                         { id: 'list', html: `<div class="gp-app" data-app="list"><div class="gp-app-icon gp-app-msg">${ic('fa-comment-dots')}${unread > 0 ? `<span class="gp-app-badge">${unread > 9 ? '9+' : unread}</span>` : ''}</div><div class="gp-app-name">Сообщения</div></div>` },
                         { id: 'tw', html: `<div class="gp-app" data-app="tw"><div class="gp-app-icon gp-app-tw">${brand('fa-x-twitter')}</div><div class="gp-app-name">Twitter</div></div>` },
-                        { id: 'ig', html: `<div class="gp-app" data-app="ig"><div class="gp-app-icon gp-app-ig">${brand('fa-instagram')}</div><div class="gp-app-name">Instagram</div></div>` },
+                        { id: 'ig', html: `<div class="gp-app" data-app="ig"><div class="gp-app-icon gp-app-ig ${igHomeStyle()}">${igHomeStyle() ? ic('fa-user-group') : brand('fa-instagram')}</div><div class="gp-app-name">${igLabel()}</div></div>` },
                         { id: 'socialhub', html: `<div class="gp-app" data-app="${activeStoryEvent ? 'storyevent' : 'socialhub'}"><div class="gp-app-icon gp-app-events${activeStoryEvent ? ' gp-event-pulse' : ''}">${ic('fa-wand-sparkles')}${activeStoryEvent ? '<span class="gp-app-badge">!</span>' : ''}</div><div class="gp-app-name">Ивенты</div></div>` },
                         { id: 'of', html: `<div class="gp-app" data-app="of"><div class="gp-app-icon gp-app-of">${ic('fa-heart')}</div><div class="gp-app-name">OnlyFans</div></div>` },
                         { id: 'bank', html: `<div class="gp-app" data-app="bank"><div class="gp-app-icon gp-app-bank">${ic('fa-building-columns')}${bankBadgeCount() > 0 ? `<span class="gp-app-badge">${bankBadgeCount()}</span>` : ''}</div><div class="gp-app-name">Банк</div></div>` },
@@ -2925,16 +2925,17 @@ function renderIg(screen) {
     setHtmlKeepScroll(screen, '.gp-feed', `
         <div class="gp-header gp-thread-header">
             <button class="gp-iconbtn" id="gp-back">${ic('fa-chevron-left')}</button>
-            <div class="gp-title gp-title-app">${brand('fa-instagram')}</div>
+            <div class="gp-title gp-title-app">${igHomeStyle() ? `${ic('fa-user-group')}&nbsp;${igLabel()}` : brand('fa-instagram')}</div>
             <button class="gp-iconbtn" data-open-social title="Профиль и задания">${ic('fa-chart-line')}</button>
             <button class="gp-iconbtn" id="gp-ig-new" title="Новый пост">${ic('fa-plus')}</button>
             <button class="gp-iconbtn" id="gp-ig-refresh" title="Пересобрать ленту заново" ${genBusy ? 'disabled' : ''}>${ic('fa-rotate')}</button>
             <button class="gp-iconbtn" id="gp-ig-gen" title="Дописать в ленту" ${genBusy ? 'disabled' : ''}>${genBusy ? ic('fa-spinner fa-spin') : ic('fa-wand-magic-sparkles')}</button>
         </div>
+        <div class="gp-ig-banner-myspace">myspace.com &nbsp;·&nbsp; home &nbsp;·&nbsp; mail &nbsp;·&nbsp; browse</div>
         <div class="gp-feed" id="gp-ig-feed">
             ${igStoriesRow()}
             ${posts.length === 0
-                ? `<div class="gp-empty"><div class="gp-empty-icon">${brand('fa-instagram')}</div><div class="gp-empty-title">Лента пуста</div><div class="gp-empty-text">${ic('fa-wand-magic-sparkles')} — сгенерировать ленту<br>${ic('fa-plus')} — выложить своё фото</div></div>`
+                ? `<div class="gp-empty"><div class="gp-empty-icon">${igHomeStyle() ? ic('fa-user-group') : brand('fa-instagram')}</div><div class="gp-empty-title">${igHomeStyle() ? 'No friends yet' : 'Лента пуста'}</div><div class="gp-empty-text">${ic('fa-wand-magic-sparkles')} — сгенерировать ленту<br>${ic('fa-plus')} — выложить своё фото</div></div>`
                 : posts.map(p => igCard(p)).join('')}
         </div>`);
 
